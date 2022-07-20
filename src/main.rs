@@ -1,19 +1,28 @@
-use std::{sync::Arc, time::Duration};
+mod config;
+mod utils;
 
-use futures::StreamExt; // 0.3.5
-use reqwest::Client; // 0.10.6
+use std::sync::Arc;
 
-const NUM_REQUESTS: usize = 10000;
-const REQ_PR_SECOND: u64 = 1000;
-const DELAY_MILLIS: u64 = 1000 / REQ_PR_SECOND;
-const URL: &'static str = "http://localhost:9090";
+use futures::StreamExt;
+use reqwest::Client;
 
 #[tokio::main]
 async fn main() {
-    create_requests(NUM_REQUESTS).await;
+    create_requests(
+        config::URL,
+        config::NUM_REQUESTS,
+        config::DELAY_MILLIS,
+        config::REQS_PR_SECOND,
+    )
+    .await;
 }
 
-async fn create_requests(num_requests: usize) {
+async fn create_requests(
+    url: &'static str,
+    num_requests: usize,
+    delay_millis: u64,
+    reqs_pr_second: u64,
+) {
     let client = Arc::new(Client::new());
 
     let mut requests = futures::stream::FuturesUnordered::new();
@@ -21,18 +30,14 @@ async fn create_requests(num_requests: usize) {
     for i in 0..num_requests {
         let client = client.clone();
         let request = tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(delay_millis * i as u64)).await;
 
-            tokio::time::sleep(std::time::Duration::from_millis(DELAY_MILLIS * i as u64)).await;
-
-            // println!("Sending Request #{i}");
             let start_time = std::time::Instant::now();
-
-            let response = client.get(URL).send().await;
-
+            let response = client.get(url).send().await;
             let time = start_time.elapsed().as_millis();
 
             let result = match response {
-                Ok(r)  => (i, r.status().as_str().to_owned(), time),
+                Ok(r) => (i, r.status().as_str().to_owned(), time),
                 Err(e) => return Err(e),
             };
 
@@ -55,35 +60,40 @@ async fn create_requests(num_requests: usize) {
                 match response {
                     Ok(r) => {
                         response_time += r.2;
-                        println!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-                        let progress = ((count / NUM_REQUESTS as f32) * 100.0) as usize;
-                        let mut characters = std::iter::repeat("=").take(progress).collect::<String>();
-                        characters.push('>');
-                        println!("Avg. response time: {} ms, Error rate: {:>3}%, Sent requests: {}", response_time as f32 / count, (errors as f32 / NUM_REQUESTS as f32) * 100.0, count);
-                        println!("[ {:<101} {:>3}% ]", characters, progress);
-                    },
+
+                        utils::clear_terminal();
+
+                        let progress = ((count / num_requests as f32) * 100.0) as usize;
+                        let mut characters =
+                            std::iter::repeat("=").take(progress).collect::<String>();
+
+                        if progress < 100 {
+                            characters.push('>');
+                        }
+
+                        let avg_response_time = response_time as f32 / count;
+                        let error_rate = (errors as f32 / num_requests as f32) * 100.0;
+
+                        println!(
+                            "Avg. response time: {} ms, Error rate: {:>3}%, Sent requests: {}",
+                            avg_response_time, error_rate, count
+                        );
+
+                        println!("[{:<101}{:>3}% ]", characters, progress);
+                    }
                     Err(e) => {
                         errors += 1;
-                        panic!("{}", e);
                         continue;
                     }
                 }
-            },
+            }
             Err(e) => {
-                errors += 1;
                 panic!("{}", e);
-                continue;
             }
         }
     }
 
-    let time = start_time.elapsed().as_secs_f64();
+    let time = start_time.elapsed();
 
-    println!("\n\n+------------------------------------------------");
-    println!("|");
-    println!("|  Sent {} requests in:", num_requests);
-    println!("|  {time} seconds");
-    println!("|  {REQ_PR_SECOND} requests pr. second");
-    println!("|");
-    println!("+------------------------------------------------\n\n");
+    utils::print_conclusion(num_requests, time, reqs_pr_second);
 }
