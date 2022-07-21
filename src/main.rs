@@ -12,7 +12,7 @@ async fn main() {
     create_requests(
         config::URL,
         config::NUM_REQUESTS,
-        config::DELAY_MILLIS,
+        config::DELAY_NANOS,
         config::REQS_PR_SECOND,
     )
     .await;
@@ -21,7 +21,7 @@ async fn main() {
 async fn create_requests(
     url: &'static str,
     num_requests: usize,
-    delay_millis: u64,
+    delay_nanos: u64,
     reqs_pr_second: u64,
 ) {
     let client = Arc::new(Client::new());
@@ -29,7 +29,7 @@ async fn create_requests(
     let mut requests = futures::stream::FuturesUnordered::new();
 
     for i in 0..num_requests {
-        let request = send_request(url, &client, i, delay_millis);
+        let request = send_request(url, &client, i, delay_nanos);
         requests.push(request);
     }
 
@@ -61,9 +61,10 @@ async fn create_requests(
                         let avg_response_time = response_time as f32 / count;
                         let error_rate = (errors as f32 / num_requests as f32) * 100.0;
                         
+
                         utils::clear_terminal();
                         println!(
-                            "Avg. response time: {} ms, Error rate: {:>3}%, Sent requests: {}",
+                            "Avg. response time: {} ms, Error rate: {:>3}%, Responses received: {}",
                             avg_response_time, error_rate, count
                         );
 
@@ -89,10 +90,10 @@ async fn create_requests(
 }
 
 
-fn send_request(url: &'static str, client: &Arc<Client>, i: usize, delay_millis: u64) -> JoinHandle<Result<(usize, String, u128), Error>> {
+fn send_request(url: &'static str, client: &Arc<Client>, i: usize, delay_nanos: u64) -> JoinHandle<Result<(usize, String, u128), Error>> {
     let client = client.clone();
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(delay_millis * i as u64)).await;
+        tokio::time::sleep(std::time::Duration::from_nanos(delay_nanos * (i as u64))).await;
 
         let start_time = std::time::Instant::now();
         let response = client.get(url).send().await;
