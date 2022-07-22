@@ -1,5 +1,7 @@
 use std::{collections::HashSet, time::Duration};
 
+const PROGRESS_BAR_SIZE: usize = 60;
+
 // TODO this should take a struct containing all relevant information
 pub fn print_conclusion(num_requests: usize, time: Duration, reqs_pr_second: f32) {
     println!("\n\n+---------------------------------");
@@ -29,7 +31,7 @@ pub fn print_errormessages(error_messages: HashSet<String>) {
 pub fn print_progress(progress: f32, response_time: u128, response_count: usize, error_count: usize, num_requests: usize) {
     let progress_percent = (progress * 100.0) as usize;
 
-    let mut characters: String = std::iter::repeat("=").take(progress_percent).collect();
+    let mut characters: String = std::iter::repeat("=").take((progress * PROGRESS_BAR_SIZE as f32) as usize).collect();
 
     if progress < 1.0 {
         characters.push('>');
@@ -44,5 +46,5 @@ pub fn print_progress(progress: f32, response_time: u128, response_count: usize,
         avg_response_time, error_rate, response_count
     );
 
-    println!("[{:<100}] {:>3}%", characters, progress_percent);
+    println!("[{characters:<size$}] {progress_percent:>3}%", size=PROGRESS_BAR_SIZE);
 }
