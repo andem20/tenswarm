@@ -1,109 +1,74 @@
 mod config;
 mod utils;
 
-use std::{sync::Arc, collections::HashSet};
+use std::{sync::Arc, error::Error};
 
-use futures::StreamExt;
-use reqwest::{Client, Error};
-use tokio::task::JoinHandle;
+use tokio::{net::TcpStream, io::{BufReader, AsyncBufReadExt, AsyncWriteExt}, sync::Mutex};
 
 #[tokio::main]
-async fn main() {
-    create_requests(
-        config::URL,
-        config::NUM_REQUESTS,
-        config::DELAY_NANOS,
-        config::REQS_PR_SECOND,
-    )
-    .await;
-}
+async fn main() -> Result<(), Box<dyn Error>> {
+    let mut tasks = Vec::with_capacity(config::NUM_CLIENTS);
 
-async fn create_requests(
-    url: &'static str,
-    num_requests: usize,
-    delay_nanos: u64,
-    reqs_pr_second: u64,
-) {
-    let client = Arc::new(Client::new());
+    let headers = Arc::new(vec![
+        format!("GET {} HTTP/1.1", "/").as_str(),
+        "\r\n",
+    ].join("\r\n"));
 
-    let mut requests = futures::stream::FuturesUnordered::new();
-
-    for i in 0..num_requests {
-        let request = send_request(url, &client, i, delay_nanos);
-        requests.push(request);
-    }
+    let total_response_time = Arc::new(Mutex::new(0));
+    let total_response_count = Arc::new(Mutex::new(0));
 
     let start_time = std::time::Instant::now();
+        
+    for _client in 0..config::NUM_CLIENTS {
+        let headers = headers.clone();
+        let total_response_count = total_response_count.clone();
+        let total_response_time = total_response_time.clone();
 
-    let mut count = 0.0;
-    let mut response_time: u128 = 0;
-    let mut errors = 0;
-    let mut error_messages = HashSet::new();
+        let task = tokio::task::spawn(async move {
+            let stream = TcpStream::connect(config::URL).await?;
+            let mut stream = BufReader::new(stream);
+            
+            for i in 0..config::NUM_REQUESTS {
+                let mut buffer = String::new();
 
-    while let Some(response) = requests.next().await {
-        match response {
-            Ok(response) => {
-                count += 1.0;
+                let start_time = std::time::Instant::now();
+
+                stream.write_all(headers.as_bytes()).await?;
                 
-                match response {
-                    Ok(r) => {
-                        response_time += r.2;
+                stream.read_line(&mut buffer).await?;
+                let len = stream.fill_buf().await.unwrap().len();
+                stream.consume(len);
 
-                        
-                        let progress = ((count / num_requests as f32) * 100.0) as usize;
-                        let mut characters =
-                        std::iter::repeat("=").take(progress).collect::<String>();
-                        
-                        if progress < 100 {
-                            characters.push('>');
-                        }
-                        
-                        let avg_response_time = response_time as f32 / count;
-                        let error_rate = (errors as f32 / num_requests as f32) * 100.0;
-                        
+                let response_time = start_time.elapsed().as_millis();
 
-                        utils::clear_terminal();
-                        println!(
-                            "Avg. response time: {} ms, Error rate: {:>3}%, Responses received: {}",
-                            avg_response_time, error_rate, count
-                        );
+                let mut total_response_time = total_response_time.lock().await;
+                let mut total_response_count = total_response_count.lock().await;
+                *total_response_time += response_time;
+                *total_response_count += 1;
 
-                        println!("[{:<101}{:>3}% ]", characters, progress);
-                    }
-                    Err(e) => {
-                        errors += 1;
-                        error_messages.insert(e.to_string());
-                        continue;
-                    }
-                }
+                let progress = *total_response_count as f32 / (config::NUM_REQUESTS * config::NUM_CLIENTS) as f32;
+                utils::print_progress(
+                    progress,
+                    *total_response_time,
+                    *total_response_count,
+                    0, // TODO
+                    config::NUM_REQUESTS,
+                );
             }
-            Err(e) => {
-                panic!("{}", e);
-            }
-        }
+
+            Ok::<(), std::io::Error>(())
+        });
+
+        tasks.push(task);
     }
 
-    let time = start_time.elapsed();
+    futures::future::join_all(tasks).await;
 
-    utils::print_conclusion(num_requests, time, reqs_pr_second);
-    utils::print_errormessages(error_messages);
-}
+    let elapsed_time = start_time.elapsed();
 
+    let reqs_pr_second = (config::NUM_CLIENTS * config::NUM_REQUESTS) as f32 / elapsed_time.as_secs_f32();
 
-fn send_request(url: &'static str, client: &Arc<Client>, i: usize, delay_nanos: u64) -> JoinHandle<Result<(usize, String, u128), Error>> {
-    let client = client.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_nanos(delay_nanos * (i as u64))).await;
+    utils::print_conclusion(config::NUM_CLIENTS * config::NUM_REQUESTS, elapsed_time, reqs_pr_second);
 
-        let start_time = std::time::Instant::now();
-        let response = client.get(url).send().await;
-        let time = start_time.elapsed().as_millis();
-
-        let result = match response {
-            Ok(r) => (i, r.status().as_str().to_owned(), time),
-            Err(e) => return Err(e),
-        };
-
-        Ok(result)
-    })
+    Ok(())
 }
