@@ -7,6 +7,11 @@ use tokio::{net::TcpStream, io::{BufReader, AsyncBufReadExt, AsyncWriteExt}, syn
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    match TcpStream::connect(config::URL).await {
+        Ok(stream) => stream,
+        Err(e) => panic!("{e}")
+    };
+
     let mut tasks = Vec::with_capacity(config::NUM_CLIENTS);
 
     let headers = Arc::new(vec![
@@ -28,10 +33,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         
         let task = tokio::task::spawn(async move {
             let stream = TcpStream::connect(config::URL).await?;
+
             let mut stream = BufReader::new(stream);
+            let mut buffer = String::new();
             
             while overall_time.elapsed().as_millis() < config::PEAK_DURATION {
-                let mut buffer = String::new();
 
                 let start_time = std::time::Instant::now();
 
@@ -45,16 +51,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                 let mut total_response_time = total_response_time.lock().await;
                 let mut total_response_count = total_response_count.lock().await;
+
                 *total_response_time += response_time;
                 *total_response_count += 1;
 
-                let progress = overall_time.elapsed().as_millis() as f32 / config::RAMP_UP_TIME as f32;
+                let progress = overall_time.elapsed().as_millis() as f32 / config::PEAK_DURATION as f32;
                 utils::print_progress(
                     progress,
                     *total_response_time,
                     *total_response_count,
-                    0, // TODO
-                    config::NUM_REQUESTS,
                 );
             }
 
