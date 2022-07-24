@@ -1,0 +1,22 @@
+scenario:
+  clients: 1000
+  ramp-up: 30s
+  duration: 60s
+
+  host: localhost
+  port: 9090
+
+  precondition:
+    endpoint: /login
+    method: POST
+    body:
+      username: test@test.com
+      password: password
+
+  testloop:
+    interval: 1s
+
+    steps:
+      - step:
+        endpoint: /
+        method: GET
