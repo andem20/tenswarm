@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Error};
+use std::{collections::HashMap, io::Error, sync::Arc, fmt};
 
 use tokio::{net::TcpStream, io::{BufReader, AsyncWriteExt, AsyncBufReadExt, AsyncReadExt}};
 
@@ -22,10 +22,14 @@ impl TcpClient {
         self
     }
 
-    pub async fn get(&mut self, addr: String, headers: &[u8]) -> Result<Vec<u8>, Error> {
+    async fn request(&mut self, method: Method, addr: String, endpoint: String, headers: Arc<String>, body: Option<Arc<String>>) -> Result<Vec<u8>, Error> {
+        let mut all_header = format!("{:?} {} HTTP/1.1\r\n", method, endpoint.as_str());
+        all_header.push_str(&headers);
+        all_header.push_str("\r\n\r\n");
+
         let stream = self.connections.get_mut(&addr).unwrap();
 
-        stream.write_all(headers).await?;
+        stream.write_all(all_header.as_bytes()).await?;
 
         let len = stream.fill_buf().await.unwrap().len();
         let mut buffer = vec![0u8; len];
@@ -33,4 +37,18 @@ impl TcpClient {
 
         Ok(buffer)
     }
+
+    pub async fn get(&mut self, addr: String, endpoint: String, headers: Arc<String>) -> Result<Vec<u8>, Error> {
+        self.request(Method::GET, addr, endpoint, headers, None).await
+    }
+
+    pub async fn post(&mut self, addr: String, endpoint: String, headers: Arc<String>, body: Arc<String>) -> Result<Vec<u8>, Error> {
+        self.request(Method::POST, addr, endpoint, headers, Some(body)).await
+    }
+}
+
+#[derive(Debug)]
+enum Method {
+    GET,
+    POST
 }

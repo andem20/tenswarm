@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let mut tasks = Vec::with_capacity(config::NUM_CLIENTS);
 
-    let headers = Arc::new(vec![format!("GET {} HTTP/1.1", "/").as_str(), "\r\n"].join("\r\n"));
+    let headers = Arc::new("Host: localhost".to_owned());
 
     let total_response_time: Arc<Mutex<u128>> = Arc::new(Mutex::new(0));
     let total_response_count: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
@@ -70,7 +70,7 @@ fn create_client(
             let start_time = Instant::now();
 
             client
-                .get(config::URL.to_owned(), headers.as_bytes())
+                .get(config::URL.to_owned(), "/".to_owned(), headers.clone())
                 .await?;
 
             let response_time = start_time.elapsed().as_millis();
