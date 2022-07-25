@@ -1,6 +1,6 @@
 mod http_client;
 mod config;
-mod utils;
+mod print_utils;
 mod test_scenario;
 
 use http_client::HttpClient;
@@ -12,36 +12,39 @@ use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    validate_url(config::URL);
+    let scenario = Scenario::new("localhost", 9090, "5s", "60s", 100);
+    scenario.execute();
 
-    let mut tasks = Vec::with_capacity(config::NUM_CLIENTS);
+    // validate_url(config::URL);
 
-    let headers = Arc::new("Host: localhost".to_owned());
+    // let mut tasks = Vec::with_capacity(config::NUM_CLIENTS);
 
-    let total_response_time: Arc<Mutex<u128>> = Arc::new(Mutex::new(0));
-    let total_response_count: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
+    // let headers = Arc::new("Host: localhost".to_owned());
 
-    let total_time = Arc::new(Instant::now());
+    // let total_response_time: Arc<Mutex<u128>> = Arc::new(Mutex::new(0));
+    // let total_response_count: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
 
-    for _client in 0..config::NUM_CLIENTS {
-        let task = create_client(
-            &headers,
-            &total_time,
-            &total_response_count,
-            &total_response_time,
-        );
+    // let total_time = Arc::new(Instant::now());
 
-        tasks.push(task);
-    }
+    // for _client in 0..config::NUM_CLIENTS {
+    //     let task = create_client(
+    //         &headers,
+    //         &total_time,
+    //         &total_response_count,
+    //         &total_response_time,
+    //     );
 
-    futures::future::join_all(tasks).await;
+    //     tasks.push(task);
+    // }
 
-    let elapsed_time = total_time.elapsed();
-    let total_response_count = *total_response_count.lock().await;
+    // futures::future::join_all(tasks).await;
 
-    let reqs_pr_second = total_response_count as f32 / elapsed_time.as_secs_f32();
+    // let elapsed_time = total_time.elapsed();
+    // let total_response_count = *total_response_count.lock().await;
 
-    utils::print_conclusion(total_response_count, elapsed_time, reqs_pr_second);
+    // let reqs_pr_second = total_response_count as f32 / elapsed_time.as_secs_f32();
+
+    // print_utils::print_conclusion(total_response_count, elapsed_time, reqs_pr_second);
 
     Ok(())
 }
@@ -84,7 +87,7 @@ fn create_client(
             *total_response_count += 1;
 
             let progress = total_time.elapsed().as_millis() as f32 / config::PEAK_DURATION as f32;
-            utils::print_progress(progress, *total_response_time, *total_response_count);
+            print_utils::print_progress(progress, *total_response_time, *total_response_count);
         }
 
         Ok::<(), std::io::Error>(())
