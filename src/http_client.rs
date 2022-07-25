@@ -4,11 +4,11 @@ use tokio::{net::TcpStream, io::{BufReader, AsyncWriteExt, AsyncBufReadExt, Asyn
 
 type Connections = HashMap<String, BufReader<TcpStream>>;
 
-pub struct TcpClient {
+pub struct HttpClient {
     connections: Connections,
 }
 
-impl TcpClient {
+impl HttpClient {
     pub fn new() -> Self {
         Self { 
             connections: HashMap::new()

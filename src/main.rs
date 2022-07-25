@@ -1,8 +1,10 @@
-mod tcp_client;
+mod http_client;
 mod config;
 mod utils;
+mod test_scenario;
 
-use tcp_client::TcpClient;
+use http_client::HttpClient;
+use test_scenario::Scenario;
 
 use std::{error::Error, sync::Arc, time::Instant};
 
@@ -63,7 +65,7 @@ fn create_client(
     let total_time = total_time.clone();
 
     tokio::task::spawn(async move {
-        let mut client = TcpClient::new();
+        let mut client = HttpClient::new();
         let client = client.connect(config::URL).await;
 
         while total_time.elapsed().as_millis() < config::PEAK_DURATION {
