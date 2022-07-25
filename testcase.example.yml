@@ -6,7 +6,7 @@ scenario:
   host: localhost
   port: 9090
 
-  precondition:
+  pretest:
     endpoint: /login
     method: POST
     body:
@@ -18,5 +18,5 @@ scenario:
 
     steps:
       - step:
-        endpoint: /
-        method: GET
+          endpoint: /
+          method: GET
