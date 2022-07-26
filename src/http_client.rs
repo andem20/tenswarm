@@ -4,6 +4,7 @@ use tokio::{net::TcpStream, io::{BufReader, AsyncWriteExt, AsyncBufReadExt, Asyn
 
 type Connections = HashMap<String, BufReader<TcpStream>>;
 
+#[derive(Debug)]
 pub struct HttpClient {
     connections: Connections,
 }

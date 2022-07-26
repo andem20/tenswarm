@@ -1,5 +1,10 @@
+use std::collections::HashMap;
+
+use serde_yaml::Value;
+
 use crate::http_client::HttpClient;
 
+#[derive(Debug)]
 pub struct Scenario {
     host: String,
     port: u16,
@@ -9,13 +14,21 @@ pub struct Scenario {
 }
 
 impl Scenario {
-    pub fn new(
-        host: &'static str,
-        port: u16,
-        ramp_up: &'static str,
-        duration: &'static str,
-        clients: usize,
-    ) -> Self {
+    pub fn new(scenario_name: &'static str) -> Self {
+
+        let file_path = format!("./scenarios/{scenario_name}.yml");
+
+        let file = std::fs::File::open(file_path).expect("File does not exist.");
+
+        let map: Value = serde_yaml::from_reader(file).unwrap();
+        let scenario = &map["scenario"];
+
+        let clients = scenario["clients"].as_u64().unwrap() as usize;
+        let host = scenario["host"].as_str().unwrap().to_owned();
+        let port = scenario["port"].as_u64().unwrap() as u16;
+        let duration = scenario["duration"].as_str().unwrap();
+        let ramp_up = scenario["ramp-up"].as_str().unwrap();
+
         let clients = Vec::<HttpClient>::with_capacity(clients)
             .iter()
             .map(|_| HttpClient::new())
@@ -23,7 +36,6 @@ impl Scenario {
 
         let ramp_up = time_to_millis(ramp_up);
         let duration = time_to_millis(duration);
-        let host = host.to_owned();
 
         Self {
             host,
@@ -35,10 +47,11 @@ impl Scenario {
     }
 
     pub fn execute(&self) {
-        self.pretest();
-        self.testloop();
-        self.posttest();
-        self.teardown();
+        println!("{:?}", self);
+        // self.pretest();
+        // self.testloop();
+        // self.posttest();
+        // self.teardown();
     }
 
     fn pretest(&self) {}
@@ -57,7 +70,7 @@ impl Scenario {
     fn posttest(&self) {}
 }
 
-fn time_to_millis(time: &'static str) -> u128 {
+fn time_to_millis(time: &str) -> u128 {
     let unit: String = time.chars().filter(|c| !c.is_digit(10)).collect();
     let unit = unit.as_str();
     let time: u128 = time

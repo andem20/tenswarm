@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let scenario = Scenario::new("localhost", 9090, "5s", "60s", 100);
+    let scenario = Scenario::new("testcase.example");
     scenario.execute();
 
     // validate_url(config::URL);
