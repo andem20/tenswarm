@@ -1,7 +1,7 @@
 scenario:
-  clients: 1000
-  ramp-up: 30s
-  duration: 60s
+  clients: 2
+  ramp-up: 2s
+  duration: 5s
 
   host: localhost
   port: 9090

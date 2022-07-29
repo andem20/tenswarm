@@ -16,9 +16,9 @@ impl HttpClient {
         }
     }
 
-    pub async fn connect(&mut self, addr: &'static str) -> &mut Self {
-        let connection = BufReader::new(TcpStream::connect(addr).await.unwrap());
-        self.connections.insert(addr.to_owned(), connection);
+    pub async fn connect(&mut self, addr: String) -> &mut Self {
+        let connection = BufReader::new(TcpStream::connect(&addr).await.unwrap());
+        self.connections.insert(addr, connection);
 
         self
     }

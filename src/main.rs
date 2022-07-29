@@ -13,7 +13,7 @@ use tokio::sync::Mutex;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let scenario = Scenario::new("testcase.example");
-    scenario.execute();
+    scenario.execute().await;
 
     // validate_url(config::URL);
 
@@ -56,40 +56,40 @@ fn validate_url(url: &'static str) {
     };
 }
 
-fn create_client(
-    headers: &Arc<String>,
-    total_time: &Arc<Instant>,
-    total_response_count: &Arc<Mutex<usize>>,
-    total_response_time: &Arc<Mutex<u128>>,
-) -> tokio::task::JoinHandle<Result<(), std::io::Error>> {
-    let headers = headers.clone();
-    let total_response_count = total_response_count.clone();
-    let total_response_time = total_response_time.clone();
-    let total_time = total_time.clone();
+// fn create_client(
+//     headers: &Arc<String>,
+//     total_time: &Arc<Instant>,
+//     total_response_count: &Arc<Mutex<usize>>,
+//     total_response_time: &Arc<Mutex<u128>>,
+// ) -> tokio::task::JoinHandle<Result<(), std::io::Error>> {
+//     let headers = headers.clone();
+//     let total_response_count = total_response_count.clone();
+//     let total_response_time = total_response_time.clone();
+//     let total_time = total_time.clone();
 
-    tokio::task::spawn(async move {
-        let mut client = HttpClient::new();
-        let client = client.connect(config::URL).await;
+//     tokio::task::spawn(async move {
+//         let mut client = HttpClient::new();
+//         let client = client.connect(config::URL).await;
 
-        while total_time.elapsed().as_millis() < config::PEAK_DURATION {
-            let start_time = Instant::now();
+//         while total_time.elapsed().as_millis() < config::PEAK_DURATION {
+//             let start_time = Instant::now();
 
-            client
-                .get(config::URL.to_owned(), "/".to_owned(), headers.clone())
-                .await?;
+//             client
+//                 .get(config::URL.to_owned(), "/".to_owned(), headers.clone())
+//                 .await?;
 
-            let response_time = start_time.elapsed().as_millis();
+//             let response_time = start_time.elapsed().as_millis();
 
-            let mut total_response_time = total_response_time.lock().await;
-            let mut total_response_count = total_response_count.lock().await;
+//             let mut total_response_time = total_response_time.lock().await;
+//             let mut total_response_count = total_response_count.lock().await;
 
-            *total_response_time += response_time;
-            *total_response_count += 1;
+//             *total_response_time += response_time;
+//             *total_response_count += 1;
 
-            let progress = total_time.elapsed().as_millis() as f32 / config::PEAK_DURATION as f32;
-            print_utils::print_progress(progress, *total_response_time, *total_response_count);
-        }
+//             let progress = total_time.elapsed().as_millis() as f32 / config::PEAK_DURATION as f32;
+//             print_utils::print_progress(progress, *total_response_time, *total_response_count);
+//         }
 
-        Ok::<(), std::io::Error>(())
-    })
-}
+//         Ok::<(), std::io::Error>(())
+//     })
+// }
