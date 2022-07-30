@@ -1,5 +1,5 @@
 scenario:
-  clients: 2
+  clients: 200
   ramp-up: 2s
   duration: 5s
 
@@ -14,7 +14,7 @@ scenario:
       password: password
 
   testloop:
-    interval: 1s
+    interval: 100ms
 
     steps:
       - step:
