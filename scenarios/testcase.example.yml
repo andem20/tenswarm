@@ -14,7 +14,7 @@ scenario:
       password: password
 
   testloop:
-    interval: 100ms
+    interval: 0ms
 
     steps:
       - step:

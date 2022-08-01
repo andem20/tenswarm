@@ -1,7 +1,14 @@
-use std::{sync::Arc, thread, time::{Duration, Instant}};
+use std::{
+    sync::Arc,
+    thread,
+    time::{Duration, Instant},
+};
 
 use serde_yaml::Value;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{
+    mpsc::{Receiver, Sender},
+    Mutex,
+};
 
 use crate::{http_client::HttpClient, print_utils};
 
@@ -13,8 +20,6 @@ pub struct Scenario {
     duration: u128, // Duration in millis
     clients: Vec<HttpClient>,
     scenario_map: Value,
-    rx: Receiver<(u128, u128)>,
-    tx: Sender<(u128, u128)>
 }
 
 impl Scenario {
@@ -41,8 +46,6 @@ impl Scenario {
         let ramp_up = time_to_millis(ramp_up);
         let duration = time_to_millis(duration);
 
-        let (tx, rx) = tokio::sync::mpsc::channel(100);
-
         Self {
             host,
             port,
@@ -50,8 +53,6 @@ impl Scenario {
             duration,
             clients,
             scenario_map,
-            rx,
-            tx
         }
     }
 
@@ -83,61 +84,52 @@ impl Scenario {
         let headers = Arc::new("Host: localhost".to_owned());
         let time_offset = interval / self.clients.len() as u64;
 
-        for (i, mut client) in self.clients.into_iter().enumerate() {
+        for (_i, mut client) in self.clients.into_iter().enumerate() {
             thread::sleep(Duration::from_millis(time_offset));
             let steps = steps.clone();
             let headers = headers.clone();
             let addr = addr.clone();
-            let tx = self.tx.clone();
-            
+
             let task = tokio::spawn(async move {
                 let client = client.connect(addr.clone()).await;
 
+                let mut total_response_count = 0;
+
                 while total_start_time.elapsed().as_millis() < duration {
                     // TODO Include ramp up
-                    if interval != 0 { 
+                    if interval != 0 {
                         tokio::time::sleep(Duration::from_millis(interval)).await;
                     }
 
                     for step in steps.iter() {
                         let endpoint = step["step"]["endpoint"].as_str().unwrap();
-                        let _method = step["step"]["method"].as_str().unwrap();
 
-                        let response_start_time = std::time::Instant::now();
                         let _resp = client
                             .get(addr.clone(), endpoint.to_owned(), headers.clone())
                             .await
                             .unwrap();
-                        
-                        let message = (response_start_time.elapsed().as_millis(), total_start_time.elapsed().as_millis());
-                        tx.send(message).await.unwrap();
+
+                        total_response_count += 1;
                     }
                 }
+
+                total_response_count
             });
 
             tasks.push(task);
         }
 
-        let mut total_response_time = 0;
+        let test = futures::future::join_all(tasks).await;
+
         let mut total_response_count = 0;
 
-        let status = tokio::spawn(async move {
-            while let Some(message) = self.rx.recv().await {
-                total_response_time += message.0;
-                total_response_count += 1;
-                let progress = message.1 as f32 / self.duration as f32;
-                print_utils::print_progress(progress, total_response_time, total_response_count);
-
-                if progress >= 1.0 {
-                    let elapsed_time = total_start_time.elapsed();
-                    let reqs_pr_second = total_response_count as f32 / elapsed_time.as_secs_f32();
-                    print_utils::print_conclusion(total_response_count, elapsed_time, reqs_pr_second);
-                }
-            }
+        test.into_iter().for_each(|result| {
+            let response_count = result.unwrap();
+            total_response_count += response_count;
         });
 
-        futures::future::join_all(tasks).await;
-
+        println!("Reponse count: {total_response_count}");
+        println!("Requests pr. second: {}", total_response_count as f32 / total_start_time.elapsed().as_secs_f32());
     }
 
     fn teardown(&self) {}
@@ -148,7 +140,7 @@ impl Scenario {
         let interval = self.scenario_map["scenario"]["testloop"]["interval"]
             .as_str()
             .unwrap();
-        
+
         time_to_millis(interval) as u64
     }
 }
