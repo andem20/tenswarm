@@ -5,19 +5,14 @@ use std::{
 };
 
 use serde_yaml::Value;
-use tokio::sync::{
-    mpsc::{Receiver, Sender},
-    Mutex,
-};
 
-use crate::{http_client::HttpClient, print_utils};
+use crate::{clients::http_client::HttpClient, utils};
 
-// #[derive(Debug)]
 pub struct Scenario {
     host: String,
     port: u16,
-    ramp_up: u128,  // Ramp up time in millis
-    duration: u128, // Duration in millis
+    ramp_up_millis: u128,
+    duration_millis: u128,
     clients: Vec<HttpClient>,
     scenario_map: Value,
 }
@@ -26,31 +21,25 @@ impl Scenario {
     pub fn new(scenario_name: &'static str) -> Self {
         let file_path = format!("./scenarios/{scenario_name}.yml");
 
-        let file = std::fs::File::open(file_path).expect("File does not exist.");
-
-        let scenario_map: Value = serde_yaml::from_reader(file).unwrap();
+        let scenario_map = utils::file::load_yaml(&file_path).unwrap();
         let scenario = &scenario_map["scenario"];
-
+        
         let clients_size = scenario["clients"].as_u64().unwrap() as usize;
         let host = scenario["host"].as_str().unwrap().to_owned();
         let port = scenario["port"].as_u64().unwrap() as u16;
         let duration = scenario["duration"].as_str().unwrap();
         let ramp_up = scenario["ramp-up"].as_str().unwrap();
 
-        let mut clients = Vec::with_capacity(clients_size);
+        let clients = create_clients(clients_size);
 
-        for _ in 0..clients_size {
-            clients.push(HttpClient::new());
-        }
-
-        let ramp_up = time_to_millis(ramp_up);
-        let duration = time_to_millis(duration);
+        let ramp_up_millis = utils::time::string_to_millis_u128(ramp_up);
+        let duration_millis = utils::time::string_to_millis_u128(duration);
 
         Self {
             host,
             port,
-            ramp_up,
-            duration,
+            ramp_up_millis,
+            duration_millis,
             clients,
             scenario_map,
         }
@@ -66,10 +55,10 @@ impl Scenario {
 
     fn pretest(&self) {}
 
-    async fn testloop(mut self) {
+    async fn testloop(self) {
         let mut tasks = Vec::with_capacity(self.clients.len());
 
-        let duration = self.duration;
+        let duration = self.duration_millis;
         let steps = self.scenario_map["scenario"]["testloop"]["steps"]
             .as_sequence()
             .unwrap()
@@ -93,7 +82,8 @@ impl Scenario {
             let task = tokio::spawn(async move {
                 let client = client.connect(addr.clone()).await;
 
-                let mut total_response_count = 0;
+                let mut total_response_count: u32 = 0;
+                let mut total_response_time = 0;
 
                 while total_start_time.elapsed().as_millis() < duration {
                     // TODO Include ramp up
@@ -104,16 +94,19 @@ impl Scenario {
                     for step in steps.iter() {
                         let endpoint = step["step"]["endpoint"].as_str().unwrap();
 
+                        let start_time = std::time::Instant::now();
                         let _resp = client
                             .get(addr.clone(), endpoint.to_owned(), headers.clone())
                             .await
                             .unwrap();
+                        
+                        total_response_time += start_time.elapsed().as_millis();
 
                         total_response_count += 1;
                     }
                 }
 
-                total_response_count
+                (total_response_count, total_response_time)
             });
 
             tasks.push(task);
@@ -122,14 +115,17 @@ impl Scenario {
         let test = futures::future::join_all(tasks).await;
 
         let mut total_response_count = 0;
+        let mut total_response_time = 0;
 
         test.into_iter().for_each(|result| {
-            let response_count = result.unwrap();
+            let (response_count, response_time) = result.unwrap();
             total_response_count += response_count;
+            total_response_time += response_time;
         });
 
         println!("Reponse count: {total_response_count}");
-        println!("Requests pr. second: {}", total_response_count as f32 / total_start_time.elapsed().as_secs_f32());
+        println!("Requests pr. second: {:.2}", total_response_count as f32 / total_start_time.elapsed().as_secs_f32());
+        println!("Avg. response time: {:.2}ms", total_response_time as f32 / total_response_count as f32);
     }
 
     fn teardown(&self) {}
@@ -141,27 +137,17 @@ impl Scenario {
             .as_str()
             .unwrap();
 
-        time_to_millis(interval) as u64
+        utils::time::string_to_millis_u128(interval) as u64
     }
 }
 
-fn time_to_millis(time: &str) -> u128 {
-    let unit: String = time.chars().filter(|c| !c.is_digit(10)).collect();
-    let unit = unit.as_str();
-    let time: u128 = time
-        .chars()
-        .filter(|c| c.is_digit(10))
-        .collect::<String>()
-        .parse()
-        .unwrap();
 
-    let factor = match unit {
-        "t" => 3600000,
-        "m" => 60000,
-        "s" => 1000,
-        "ms" => 1,
-        _ => 1,
-    };
+fn create_clients(clients_size: usize) -> Vec<HttpClient> {
+    let mut clients = Vec::with_capacity(clients_size);
 
-    time * factor
+    for _ in 0..clients_size {
+        clients.push(HttpClient::new());
+    }
+
+    clients
 }

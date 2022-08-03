@@ -1,6 +1,5 @@
-mod http_client;
-mod config;
-mod print_utils;
+mod clients;
+mod utils;
 mod test_scenario;
 
 use test_scenario::Scenario;
