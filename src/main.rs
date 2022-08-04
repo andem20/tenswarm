@@ -1,10 +1,11 @@
 mod clients;
 mod utils;
-mod test_scenario;
+mod scenario;
 
-use test_scenario::Scenario;
 
 use std::error::Error;
+
+use scenario::test_scenario::Scenario;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
