@@ -1,10 +1,12 @@
-use crate::{clients::http_client::HttpClient, utils};
+use futures::future::BoxFuture;
 use serde_yaml::Value;
 use std::{
     sync::Arc,
     thread,
     time::{Duration, Instant},
 };
+
+use crate::{clients::{custom_http_client::CustomHttpClient, client_trait::HttpClient, request::Method}, utils};
 
 type TestResult = (u32, u128);
 
@@ -13,7 +15,7 @@ pub struct Scenario {
     port: u16,
     ramp_up_millis: u128,
     duration_millis: u128,
-    clients: Vec<HttpClient>,
+    clients: Vec<CustomHttpClient>,
     scenario_map: Value,
 }
 
@@ -120,18 +122,18 @@ impl Scenario {
     }
 }
 
-fn create_clients(clients_size: usize) -> Vec<HttpClient> {
+fn create_clients(clients_size: usize) -> Vec<CustomHttpClient> {
     let mut clients = Vec::with_capacity(clients_size);
 
     for _ in 0..clients_size {
-        clients.push(HttpClient::new());
+        clients.push(CustomHttpClient::new());
     }
 
     clients
 }
 
 fn create_test_task(
-    mut client: HttpClient,
+    mut client: CustomHttpClient,
     steps: &Vec<Value>,
     headers: &Arc<String>,
     addr: &Arc<String>,
@@ -160,7 +162,7 @@ fn create_test_task(
 
                 let start_time = std::time::Instant::now();
                 let _resp = client
-                    .get(addr.clone(), endpoint.to_owned(), headers.clone())
+                    .request(Method::GET, addr.clone(), endpoint.to_owned(), headers.clone(), None)
                     .await
                     .unwrap();
 
