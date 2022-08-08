@@ -98,6 +98,7 @@ impl Scenario {
             total_response_time += response_time;
         });
 
+        println!("Time elapsed: {:.2}s", total_start_time.elapsed().as_secs_f32());
         println!("Reponse count: {total_response_count}");
         println!(
             "Requests pr. second: {:.2}",
