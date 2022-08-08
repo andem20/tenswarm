@@ -28,7 +28,7 @@ pub fn print_errormessages(error_messages: HashSet<String>) {
     });
 }
 
-pub fn print_progress(progress: f32, response_time: u128, response_count: usize) {
+pub fn print_progress(progress: f32) {
     let progress_percent = (progress * 100.0) as usize;
 
     let mut characters: String = std::iter::repeat("=").take((progress * PROGRESS_BAR_SIZE as f32) as usize).collect();
@@ -37,13 +37,6 @@ pub fn print_progress(progress: f32, response_time: u128, response_count: usize)
         characters.push('>');
     }
 
-    let avg_response_time = response_time as f32 / response_count as f32;
-
     clear_terminal();
-    println!(
-        "Avg. response time: {:.2} ms, Responses received: {:>6}",
-        avg_response_time, response_count
-    );
-
     println!("[{characters:<size$}] {progress_percent:>3}%", size = PROGRESS_BAR_SIZE);
 }

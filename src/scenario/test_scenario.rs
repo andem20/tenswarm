@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{clients::{custom_http_client::CustomHttpClient, client_trait::HttpClient, request::Method}, utils};
+use crate::{clients::{custom_http_client::CustomHttpClient, client_trait::HttpClient, request::Method}, utils::{self, print::print_progress}};
 
 type TestResult = (u32, u128);
 
@@ -87,7 +87,24 @@ impl Scenario {
             tasks.push(task);
         }
 
+        let timer = tokio::spawn(async move {
+            let start_time = tokio::time::Instant::now();
+            let mut interval = tokio::time::interval(Duration::from_millis(500));
+
+            loop {
+                let instant = interval.tick().await;
+
+                let progress = instant.duration_since(start_time).as_millis() as f32 / self.duration_millis as f32;
+                print_progress(progress);
+
+                if instant.duration_since(start_time).as_millis() >= self.duration_millis {
+                    break;
+                }
+            }
+        });
+
         let test = futures::future::join_all(tasks).await;
+        timer.await.unwrap();
 
         let mut total_response_count = 0;
         let mut total_response_time = 0;
