@@ -26,7 +26,7 @@ impl CustomHttpClient {
 
 #[async_trait]
 impl HttpClient for CustomHttpClient {
-    async fn connect(&mut self, addr: Arc<String>) -> &mut Self {
+    async fn connect(mut self: Box<Self>, addr: Arc<String>) -> Box<dyn HttpClient> {
         let connection = BufReader::new(TcpStream::connect(addr.to_string()).await.unwrap());
         self.connections.insert(addr.to_string(), connection);
 

@@ -1,14 +1,15 @@
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, time::{Duration, Instant}};
 
 const PROGRESS_BAR_SIZE: usize = 40;
 
 // TODO this should take a struct containing all relevant information
-pub fn print_conclusion(num_requests: usize, time: Duration, reqs_pr_second: f32) {
+pub fn print_conclusion(total_start_time: Instant, total_response_count: u32, total_response_time: u128) {
     println!("\n\n+---------------------------------");
     println!("|");
-    println!("|  Requests sent: {}", num_requests);
-    println!("|  Time elapsed: {:.2} seconds", time.as_secs_f32());
-    println!("|  {:.2} requests pr. second", reqs_pr_second);
+    println!("|  Time elapsed: {:.2}s", total_start_time.elapsed().as_secs_f32());
+    println!("|  Response Count: {total_response_count}");
+    println!("|  Requests pr. second: {:.2}", total_response_count as f32 / total_start_time.elapsed().as_secs_f32());
+    println!("|  Avg. response time: {:.2}ms", total_response_time as f32 / total_response_count as f32);
     println!("|");
     println!("+---------------------------------\n\n");
 }

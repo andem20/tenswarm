@@ -1,4 +1,3 @@
-use futures::future::BoxFuture;
 use serde_yaml::Value;
 use std::{
     sync::Arc,
@@ -6,7 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{clients::{custom_http_client::CustomHttpClient, client_trait::HttpClient, request::Method}, utils::{self, print::print_progress}};
+use crate::{clients::{custom_http_client::CustomHttpClient, client_trait::HttpClient, request::Method}, utils::{self, print::{print_progress, print_conclusion}}};
 
 type TestResult = (u32, u128);
 
@@ -15,7 +14,7 @@ pub struct Scenario {
     port: u16,
     ramp_up_millis: u128,
     duration_millis: u128,
-    clients: Vec<CustomHttpClient>,
+    clients: Vec<Box<dyn HttpClient>>,
     scenario_map: Value,
 }
 
@@ -89,7 +88,7 @@ impl Scenario {
 
         let timer = tokio::spawn(async move {
             let start_time = tokio::time::Instant::now();
-            let mut interval = tokio::time::interval(Duration::from_millis(500));
+            let mut interval = tokio::time::interval(Duration::from_millis(1000));
 
             loop {
                 let instant = interval.tick().await;
@@ -115,16 +114,7 @@ impl Scenario {
             total_response_time += response_time;
         });
 
-        println!("Time elapsed: {:.2}s", total_start_time.elapsed().as_secs_f32());
-        println!("Reponse count: {total_response_count}");
-        println!(
-            "Requests pr. second: {:.2}",
-            total_response_count as f32 / total_start_time.elapsed().as_secs_f32()
-        );
-        println!(
-            "Avg. response time: {:.2}ms",
-            total_response_time as f32 / total_response_count as f32
-        );
+        print_conclusion(total_start_time, total_response_count, total_response_time);
     }
 
     fn teardown(&self) {}
@@ -140,18 +130,18 @@ impl Scenario {
     }
 }
 
-fn create_clients(clients_size: usize) -> Vec<CustomHttpClient> {
-    let mut clients = Vec::with_capacity(clients_size);
+fn create_clients(clients_size: usize) -> Vec<Box<dyn HttpClient>> {
+    let mut clients: Vec<Box<dyn HttpClient>> = Vec::with_capacity(clients_size);
 
     for _ in 0..clients_size {
-        clients.push(CustomHttpClient::new());
+        clients.push(Box::new(CustomHttpClient::new()));
     }
 
     clients
 }
 
 fn create_test_task(
-    mut client: CustomHttpClient,
+    client: Box<dyn HttpClient>,
     steps: &Vec<Value>,
     headers: &Arc<String>,
     addr: &Arc<String>,
@@ -164,7 +154,7 @@ fn create_test_task(
     let addr = addr.clone();
 
     let task = tokio::spawn(async move {
-        let client = client.connect(addr.clone()).await;
+        let mut client = client.connect(addr.clone()).await;
 
         let mut total_response_count: u32 = 0;
         let mut total_response_time = 0;
