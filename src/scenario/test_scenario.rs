@@ -5,7 +5,13 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{clients::{custom_http_client::CustomHttpClient, client_trait::HttpClient, request::Method}, utils::{self, print::{print_progress, print_conclusion}}};
+use crate::{
+    clients::{client_trait::HttpClient, custom_http_client::CustomHttpClient, request::Method},
+    utils::{
+        self,
+        print::{print_conclusion, print_progress},
+    },
+};
 
 type TestResult = (u32, u128);
 
@@ -47,7 +53,6 @@ impl Scenario {
     }
 
     pub async fn execute(self) {
-        // println!("{:?}", self);
         // self.pretest();
         self.testloop().await;
         // self.posttest();
@@ -93,7 +98,8 @@ impl Scenario {
             loop {
                 let instant = interval.tick().await;
 
-                let progress = instant.duration_since(start_time).as_millis() as f32 / self.duration_millis as f32;
+                let progress = instant.duration_since(start_time).as_millis() as f32
+                    / self.duration_millis as f32;
                 print_progress(progress);
 
                 if instant.duration_since(start_time).as_millis() >= self.duration_millis {
@@ -170,7 +176,13 @@ fn create_test_task(
 
                 let start_time = std::time::Instant::now();
                 let _resp = client
-                    .request(Method::GET, addr.clone(), endpoint.to_owned(), headers.clone(), None)
+                    .request(
+                        Method::GET,
+                        addr.clone(),
+                        endpoint.to_owned(),
+                        headers.clone(),
+                        None,
+                    )
                     .await
                     .unwrap();
 
