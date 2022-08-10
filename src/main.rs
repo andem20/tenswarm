@@ -1,6 +1,7 @@
 mod clients;
 mod utils;
 mod scenario;
+mod test_clients;
 
 
 use std::error::Error;
