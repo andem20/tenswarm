@@ -7,10 +7,7 @@ use std::{
 
 use crate::{
     clients::{client_trait::HttpClient, custom_http_client::CustomHttpClient, request::Method},
-    utils::{
-        self,
-        print::{print_conclusion, print_progress},
-    },
+    utils,
 };
 
 type TestResult = (u32, u128);
@@ -91,22 +88,7 @@ impl Scenario {
             tasks.push(task);
         }
 
-        let timer = tokio::spawn(async move {
-            let start_time = tokio::time::Instant::now();
-            let mut interval = tokio::time::interval(Duration::from_millis(1000));
-
-            loop {
-                let instant = interval.tick().await;
-
-                let progress = instant.duration_since(start_time).as_millis() as f32
-                    / self.duration_millis as f32;
-                print_progress(progress);
-
-                if instant.duration_since(start_time).as_millis() >= self.duration_millis {
-                    break;
-                }
-            }
-        });
+        let timer = utils::time::create_timer(self.duration_millis);
 
         let test = futures::future::join_all(tasks).await;
         timer.await.unwrap();
@@ -120,7 +102,7 @@ impl Scenario {
             total_response_time += response_time;
         });
 
-        print_conclusion(total_start_time, total_response_count, total_response_time);
+        utils::print::print_conclusion(total_start_time, total_response_count, total_response_time);
     }
 
     fn teardown(&self) {}
@@ -159,7 +141,7 @@ fn create_test_task(
     let headers = headers.clone();
     let addr = addr.clone();
 
-    let task = tokio::spawn(async move {
+    tokio::spawn(async move {
         let mut client = client.connect(addr.clone()).await;
 
         let mut total_response_count: u32 = 0;
@@ -193,7 +175,5 @@ fn create_test_task(
         }
 
         (total_response_count, total_response_time)
-    });
-
-    task
+    })
 }
