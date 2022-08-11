@@ -73,6 +73,8 @@ impl Scenario {
 
         let total_start_time = Instant::now();
 
+        let (tx, mut _rx) = tokio::sync::broadcast::channel(1);
+
         for (_i, client) in self.clients.into_iter().enumerate() {
             thread::sleep(Duration::from_millis(time_offset));
             let task = create_test_task(
@@ -80,15 +82,14 @@ impl Scenario {
                 &steps,
                 &headers,
                 &addr,
-                total_start_time,
                 interval,
-                self.duration_millis,
+                tx.subscribe()
             );
 
             tasks.push(task);
         }
 
-        let timer = utils::time::create_timer(self.duration_millis);
+        let timer = utils::time::create_timer(self.duration_millis, tx);
 
         let test = futures::future::join_all(tasks).await;
         timer.await.unwrap();
@@ -133,9 +134,8 @@ fn create_test_task(
     steps: &Vec<Value>,
     headers: &Arc<String>,
     addr: &Arc<String>,
-    total_start_time: Instant,
     interval: u64,
-    duration_millis: u128,
+    mut rx: tokio::sync::broadcast::Receiver<bool>
 ) -> tokio::task::JoinHandle<TestResult> {
     let steps = steps.clone();
     let headers = headers.clone();
@@ -147,7 +147,7 @@ fn create_test_task(
         let mut total_response_count: u32 = 0;
         let mut total_response_time = 0;
 
-        while total_start_time.elapsed().as_millis() < duration_millis {
+        while rx.is_empty() {
             // TODO Include ramp up
             if interval != 0 {
                 tokio::time::sleep(Duration::from_millis(interval)).await;

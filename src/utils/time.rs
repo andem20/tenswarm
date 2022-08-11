@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+
 use super::print::print_progress;
 
 pub fn string_to_millis_u128(time: &str) -> u128 {
@@ -23,7 +24,7 @@ pub fn string_to_millis_u128(time: &str) -> u128 {
     time * factor
 }
 
-pub fn create_timer(duration_millis: u128) -> tokio::task::JoinHandle<()> {
+pub fn create_timer(duration_millis: u128, tx: tokio::sync::broadcast::Sender<bool>) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let start_time = tokio::time::Instant::now();
         let mut interval = tokio::time::interval(Duration::from_millis(1000));
@@ -36,6 +37,7 @@ pub fn create_timer(duration_millis: u128) -> tokio::task::JoinHandle<()> {
             print_progress(progress);
 
             if instant.duration_since(start_time).as_millis() >= duration_millis {
+                tx.send(true).unwrap();
                 break;
             }
         }
