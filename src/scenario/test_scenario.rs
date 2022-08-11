@@ -1,4 +1,5 @@
 use serde_yaml::Value;
+use tokio::sync::broadcast::Sender;
 use std::{
     sync::Arc,
     thread,
@@ -6,19 +7,17 @@ use std::{
 };
 
 use crate::{
-    clients::{client_trait::HttpClient, custom_http_client::CustomHttpClient, request::Method},
-    utils,
+    utils, test_clients::test_http_client::TestHttpClient,
 };
-
-type TestResult = (u32, u128);
 
 pub struct Scenario {
     host: String,
     port: u16,
     ramp_up_millis: u128,
     duration_millis: u128,
-    clients: Vec<Box<dyn HttpClient>>,
+    clients: Vec<TestHttpClient>,
     scenario_map: Value,
+    tx: Sender<bool>
 }
 
 impl Scenario {
@@ -34,10 +33,12 @@ impl Scenario {
         let duration = scenario["duration"].as_str().unwrap();
         let ramp_up = scenario["ramp-up"].as_str().unwrap();
 
-        let clients = create_clients(clients_size);
-
         let ramp_up_millis = utils::time::string_to_millis_u128(ramp_up);
         let duration_millis = utils::time::string_to_millis_u128(duration);
+        
+        let (tx, _) = tokio::sync::broadcast::channel(1);
+        
+        let clients = create_clients(clients_size, &host, port, &scenario_map, &tx);
 
         Self {
             host,
@@ -46,6 +47,7 @@ impl Scenario {
             duration_millis,
             clients,
             scenario_map,
+            tx
         }
     }
 
@@ -56,40 +58,24 @@ impl Scenario {
         // self.teardown();
     }
 
-    fn pretest(&self) {}
+    // fn pretest(&self) {}
 
     async fn testloop(self) {
         let mut tasks = Vec::with_capacity(self.clients.len());
 
-        let steps = self.scenario_map["scenario"]["testloop"]["steps"]
-            .as_sequence()
-            .unwrap()
-            .clone();
-
-        let interval = self.get_interval();
+        let interval = utils::file::get_interval(self.scenario_map);
         let time_offset = interval / self.clients.len() as u64;
-        let addr = Arc::new(format!("{}:{}", &self.host, &self.port));
-        let headers = Arc::new("Host: localhost".to_owned());
 
         let total_start_time = Instant::now();
 
-        let (tx, mut _rx) = tokio::sync::broadcast::channel(1);
-
-        for (_i, client) in self.clients.into_iter().enumerate() {
+        self.clients.into_iter().for_each(|client| {
             thread::sleep(Duration::from_millis(time_offset));
-            let task = create_test_task(
-                client,
-                &steps,
-                &headers,
-                &addr,
-                interval,
-                tx.subscribe()
-            );
 
+            let task = client.test_loop();
             tasks.push(task);
-        }
+        });
 
-        let timer = utils::time::create_timer(self.duration_millis, tx);
+        let timer = utils::time::create_timer(self.duration_millis, self.tx);
 
         let test = futures::future::join_all(tasks).await;
         timer.await.unwrap();
@@ -106,74 +92,19 @@ impl Scenario {
         utils::print::print_conclusion(total_start_time, total_response_count, total_response_time);
     }
 
-    fn teardown(&self) {}
+    // fn teardown(&self) {}
 
-    fn posttest(&self) {}
-
-    fn get_interval(&self) -> u64 {
-        let interval = self.scenario_map["scenario"]["testloop"]["interval"]
-            .as_str()
-            .unwrap();
-
-        utils::time::string_to_millis_u128(interval) as u64
-    }
+    // fn posttest(&self) {}
 }
 
-fn create_clients(clients_size: usize) -> Vec<Box<dyn HttpClient>> {
-    let mut clients: Vec<Box<dyn HttpClient>> = Vec::with_capacity(clients_size);
+fn create_clients(clients_size: usize, host: &String, port: u16, scenario_map: &Value, tx: &Sender<bool>) -> Vec<TestHttpClient> {
+    let mut clients = Vec::with_capacity(clients_size);
+
+    let addr = Arc::new(format!("{}:{}", &host, port));
 
     for _ in 0..clients_size {
-        clients.push(Box::new(CustomHttpClient::new()));
+        clients.push(TestHttpClient::new(addr.clone(), scenario_map.clone(), tx.subscribe()));
     }
 
     clients
-}
-
-fn create_test_task(
-    client: Box<dyn HttpClient>,
-    steps: &Vec<Value>,
-    headers: &Arc<String>,
-    addr: &Arc<String>,
-    interval: u64,
-    mut rx: tokio::sync::broadcast::Receiver<bool>
-) -> tokio::task::JoinHandle<TestResult> {
-    let steps = steps.clone();
-    let headers = headers.clone();
-    let addr = addr.clone();
-
-    tokio::spawn(async move {
-        let mut client = client.connect(addr.clone()).await;
-
-        let mut total_response_count: u32 = 0;
-        let mut total_response_time = 0;
-
-        while rx.is_empty() {
-            // TODO Include ramp up
-            if interval != 0 {
-                tokio::time::sleep(Duration::from_millis(interval)).await;
-            }
-
-            for step in steps.iter() {
-                let endpoint = step["step"]["endpoint"].as_str().unwrap();
-
-                let start_time = std::time::Instant::now();
-                let _resp = client
-                    .request(
-                        Method::GET,
-                        addr.clone(),
-                        endpoint.to_owned(),
-                        headers.clone(),
-                        None,
-                    )
-                    .await
-                    .unwrap();
-
-                total_response_time += start_time.elapsed().as_millis();
-
-                total_response_count += 1;
-            }
-        }
-
-        (total_response_count, total_response_time)
-    })
 }

@@ -32,7 +32,7 @@ pub fn print_errormessages(error_messages: HashSet<String>) {
 pub fn print_progress(progress: f32) {
     let progress_percent = (progress * 100.0) as usize;
 
-    let mut characters: String = std::iter::repeat("=").take((progress * PROGRESS_BAR_SIZE as f32) as usize).collect();
+    let mut characters: String = "=".repeat((progress * PROGRESS_BAR_SIZE as f32) as usize);
 
     if progress < 1.0 {
         characters.push('>');

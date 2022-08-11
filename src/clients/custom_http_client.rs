@@ -56,9 +56,3 @@ impl HttpClient for CustomHttpClient {
         Ok(buffer)
     }
 }
-
-#[derive(Debug)]
-enum Method {
-    GET,
-    POST,
-}
