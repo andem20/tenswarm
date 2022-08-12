@@ -10,7 +10,7 @@ use scenario::test_scenario::Scenario;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let scenario = Scenario::new("testcase.example");
+    let scenario = Scenario::new("testcase.http");
     scenario.execute().await;
 
     Ok(())

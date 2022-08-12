@@ -6,6 +6,8 @@ scenario:
   host: localhost
   port: 9090
 
+  protocol: http
+
   pretest:
     endpoint: /login
     method: POST

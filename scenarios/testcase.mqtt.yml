@@ -1,0 +1,30 @@
+scenario:
+  clients: 200
+  ramp-up: 2s
+  duration: 5s
+
+  host: localhost
+  port: 1883
+
+  protocol: mqtt
+
+  credentials:
+    username: test@test.com
+    password: password
+
+  pretest:
+    subscribe: 
+      - some/topic
+      - this/topic/is/different
+      - to/a/new/topic/response
+
+  testloop:
+    interval: 0ms
+
+    steps:
+      - step:
+          publish: to/a/new/topic
+      - step:
+          await: to/a/new/topic/response
+      - step:
+          publish: some/other/topic
