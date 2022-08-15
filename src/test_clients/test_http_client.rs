@@ -5,17 +5,15 @@ use tokio::sync::broadcast::Receiver;
 
 use crate::{clients::{client_trait::HttpClient, custom_http_client::CustomHttpClient, request::Method}, utils};
 
+use super::test_client::TestClient;
+
 type Client = Box<dyn HttpClient + Send>;
 type TestResult = (u32, u128);
 
 pub struct TestHttpClient {
     client: Client,
     addr: Arc<String>, 
-    steps: Vec<Value>,
-    interval: u64,
-    rx: Receiver<bool>,
-    total_response_count: u32,
-    total_response_time: u128,
+    test_client: TestClient
 }
 
 impl TestHttpClient {
@@ -29,14 +27,12 @@ impl TestHttpClient {
 
         let interval = utils::file::get_interval(scenario_map);
 
+        let test_client = TestClient::new(steps, rx, interval);
+
         TestHttpClient {
             client,
             addr,
-            steps,
-            interval,
-            rx,
-            total_response_count: 0,
-            total_response_time: 0,
+            test_client
         }
     }
 
@@ -45,14 +41,20 @@ impl TestHttpClient {
 
         tokio::spawn(async move {
             let mut client = self.client.connect(self.addr.clone()).await;
+
+            let mut total_response_count = 0;
+            let mut total_response_time = 0;
+            let steps = self.test_client.steps();
     
-            while self.rx.is_empty() {
+            while self.test_client.rx().is_empty() {
                 // TODO Include ramp up
-                if self.interval != 0 {
-                    tokio::time::sleep(Duration::from_millis(self.interval)).await;
+                if self.test_client.interval() != 0 {
+                    tokio::time::sleep(Duration::from_millis(self.test_client.interval())).await;
                 }
     
-                for step in self.steps.iter() {
+                let mut i = 0;
+
+                for step in steps.iter() {
                     let endpoint = step["step"]["endpoint"].as_str().unwrap();
     
                     let start_time = std::time::Instant::now();
@@ -67,12 +69,19 @@ impl TestHttpClient {
                         .await
                         .unwrap();
     
-                    self.total_response_count += 1;
-                    self.total_response_time += start_time.elapsed().as_millis();
+                        self.test_client.add_response_time(i, start_time.elapsed().as_millis());
+                        self.test_client.add_response_count(i, 1);
+
+                    i += 1;
                 }
             }
 
-            (self.total_response_count, self.total_response_time)
+            self.test_client.response_data().iter().for_each(|res_data| {
+                total_response_count += res_data.response_count();
+                total_response_time += res_data.response_time();
+            });
+
+            (total_response_count, total_response_time)
         })
     }
 }

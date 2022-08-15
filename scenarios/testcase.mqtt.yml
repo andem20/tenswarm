@@ -8,7 +8,7 @@ scenario:
 
   protocol: mqtt
 
-  credentials:
+  client:
     username: test@test.com
     password: password
 
