@@ -5,15 +5,14 @@ use tokio::sync::broadcast::Receiver;
 
 use crate::{clients::{client_trait::HttpClient, custom_http_client::CustomHttpClient, request::Method}, utils};
 
-use super::test_client::TestClient;
+use super::test_client::{TestClientData, TestResult, TestClient};
 
 type Client = Box<dyn HttpClient + Send>;
-type TestResult = (u32, u128);
 
 pub struct TestHttpClient {
     client: Client,
     addr: Arc<String>, 
-    test_client: TestClient
+    test_client: TestClientData
 }
 
 impl TestHttpClient {
@@ -27,7 +26,7 @@ impl TestHttpClient {
 
         let interval = utils::file::get_interval(scenario_map);
 
-        let test_client = TestClient::new(steps, rx, interval);
+        let test_client = TestClientData::new(steps, rx, interval);
 
         TestHttpClient {
             client,
@@ -35,8 +34,10 @@ impl TestHttpClient {
             test_client
         }
     }
+}
 
-    pub fn test_loop(mut self) -> tokio::task::JoinHandle<TestResult> {
+impl TestClient for TestHttpClient {
+    fn test_loop(mut self: Box<Self>) -> tokio::task::JoinHandle<TestResult> {
         let headers = Arc::new("Host: localhost".to_owned());
 
         tokio::spawn(async move {
@@ -51,10 +52,8 @@ impl TestHttpClient {
                 if self.test_client.interval() != 0 {
                     tokio::time::sleep(Duration::from_millis(self.test_client.interval())).await;
                 }
-    
-                let mut i = 0;
 
-                for step in steps.iter() {
+                for (i, step) in steps.iter().enumerate() {
                     let endpoint = step["step"]["endpoint"].as_str().unwrap();
     
                     let start_time = std::time::Instant::now();
@@ -69,10 +68,8 @@ impl TestHttpClient {
                         .await
                         .unwrap();
     
-                        self.test_client.add_response_time(i, start_time.elapsed().as_millis());
-                        self.test_client.add_response_count(i, 1);
-
-                    i += 1;
+                    self.test_client.add_response_time(i, start_time.elapsed().as_millis());
+                    self.test_client.add_response_count(i, 1);
                 }
             }
 

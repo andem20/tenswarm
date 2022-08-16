@@ -1,13 +1,14 @@
 use serde_yaml::Value;
-use tokio::sync::broadcast::Sender;
 use std::{
     sync::Arc,
     thread,
     time::{Duration, Instant},
 };
+use tokio::sync::broadcast::Sender;
 
 use crate::{
-    utils, test_clients::test_http_client::TestHttpClient,
+    test_clients::{test_client::TestClient, test_http_client::TestHttpClient},
+    utils,
 };
 
 pub struct Scenario {
@@ -15,9 +16,9 @@ pub struct Scenario {
     port: u16,
     ramp_up_millis: u128,
     duration_millis: u128,
-    clients: Vec<TestHttpClient>,
+    clients: Vec<Box<dyn TestClient>>,
     scenario_map: Value,
-    tx: Sender<bool>
+    tx: Sender<bool>,
 }
 
 impl Scenario {
@@ -35,9 +36,9 @@ impl Scenario {
 
         let ramp_up_millis = utils::time::string_to_millis_u128(ramp_up);
         let duration_millis = utils::time::string_to_millis_u128(duration);
-        
+
         let (tx, _) = tokio::sync::broadcast::channel(1);
-        
+
         let clients = create_clients(clients_size, &host, port, &scenario_map, &tx);
 
         Self {
@@ -47,7 +48,7 @@ impl Scenario {
             duration_millis,
             clients,
             scenario_map,
-            tx
+            tx,
         }
     }
 
@@ -97,13 +98,25 @@ impl Scenario {
     // fn posttest(&self) {}
 }
 
-fn create_clients(clients_size: usize, host: &String, port: u16, scenario_map: &Value, tx: &Sender<bool>) -> Vec<TestHttpClient> {
+fn create_clients(
+    clients_size: usize,
+    host: &String,
+    port: u16,
+    scenario_map: &Value,
+    tx: &Sender<bool>,
+) -> Vec<Box<dyn TestClient>> {
     let mut clients = Vec::with_capacity(clients_size);
 
     let addr = Arc::new(format!("{}:{}", &host, port));
 
     for _ in 0..clients_size {
-        clients.push(TestHttpClient::new(addr.clone(), scenario_map.clone(), tx.subscribe()));
+        let client: Box<dyn TestClient> = Box::new(TestHttpClient::new(
+            addr.clone(),
+            scenario_map.clone(),
+            tx.subscribe(),
+        ));
+        
+        clients.push(client);
     }
 
     clients

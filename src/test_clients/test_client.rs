@@ -31,14 +31,14 @@ impl ResponseMetaData {
     }
 }
 
-pub struct TestClient {
+pub struct TestClientData {
     steps: Vec<Value>,
     response_data: Vec<ResponseMetaData>,
     rx: Receiver<bool>,
     interval: u64,
 }
 
-impl TestClient {
+impl TestClientData {
     pub fn new(steps: Vec<Value>, rx: Receiver<bool>, interval: u64) -> Self {
         let mut response_data = Vec::with_capacity(steps.len());
 
@@ -85,4 +85,11 @@ impl TestClient {
         &self.rx
     }
 
+}
+
+// TODO temporary type for test result
+pub type TestResult = (u32, u128);
+
+pub trait TestClient {
+    fn test_loop(self: Box<Self>) -> tokio::task::JoinHandle<TestResult>;
 }
