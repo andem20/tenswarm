@@ -3,16 +3,19 @@ use std::{sync::Arc, time::Duration};
 use serde_yaml::Value;
 use tokio::sync::broadcast::Receiver;
 
-use crate::{clients::{client_trait::HttpClient, custom_http_client::CustomHttpClient, request::Method}, utils};
+use crate::{
+    clients::{client_trait::HttpClient, custom_http_client::CustomHttpClient, request::Method},
+    utils,
+};
 
-use super::test_client::{TestClientData, TestResult, TestClient};
+use super::test_client::{TestClient, TestClientData, TestResult};
 
 type Client = Box<dyn HttpClient + Send>;
 
 pub struct TestHttpClient {
     client: Client,
-    addr: Arc<String>, 
-    test_client: TestClientData
+    addr: Arc<String>,
+    test_client: TestClientData,
 }
 
 impl TestHttpClient {
@@ -31,7 +34,7 @@ impl TestHttpClient {
         TestHttpClient {
             client,
             addr,
-            test_client
+            test_client,
         }
     }
 }
@@ -46,7 +49,7 @@ impl TestClient for TestHttpClient {
             let mut total_response_count = 0;
             let mut total_response_time = 0;
             let steps = self.test_client.steps();
-    
+
             while self.test_client.rx().is_empty() {
                 // TODO Include ramp up
                 if self.test_client.interval() != 0 {
@@ -55,7 +58,7 @@ impl TestClient for TestHttpClient {
 
                 for (i, step) in steps.iter().enumerate() {
                     let endpoint = step["step"]["endpoint"].as_str().unwrap();
-    
+
                     let start_time = std::time::Instant::now();
                     let _resp = client
                         .request(
@@ -67,16 +70,20 @@ impl TestClient for TestHttpClient {
                         )
                         .await
                         .unwrap();
-    
-                    self.test_client.add_response_time(i, start_time.elapsed().as_millis());
+
+                    self.test_client
+                        .add_response_time(i, start_time.elapsed().as_millis());
                     self.test_client.add_response_count(i, 1);
                 }
             }
 
-            self.test_client.response_data().iter().for_each(|res_data| {
-                total_response_count += res_data.response_count();
-                total_response_time += res_data.response_time();
-            });
+            self.test_client
+                .response_data()
+                .iter()
+                .for_each(|res_data| {
+                    total_response_count += res_data.response_count();
+                    total_response_time += res_data.response_time();
+                });
 
             (total_response_count, total_response_time)
         })

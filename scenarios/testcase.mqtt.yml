@@ -19,8 +19,6 @@ scenario:
       - to/a/new/topic/response
 
   testloop:
-    interval: 0ms
-
     steps:
       - step:
           publish: to/a/new/topic

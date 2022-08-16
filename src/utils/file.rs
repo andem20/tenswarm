@@ -15,7 +15,7 @@ pub fn load_yaml(path: &str) -> Result<Value, Box<dyn Error>> {
 pub fn get_interval(scenario_map: Value) -> u64 {
     let interval = scenario_map["scenario"]["testloop"]["interval"]
         .as_str()
-        .unwrap();
+        .or(Some("0ms")).unwrap();
 
     time::string_to_millis_u128(interval) as u64
 }
