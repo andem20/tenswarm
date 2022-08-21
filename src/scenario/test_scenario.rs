@@ -60,7 +60,7 @@ impl Scenario {
 
     pub async fn execute(&self) {
         self.pretest().await;
-        // self.testloop().await;
+        self.testloop().await;
         // self.posttest();
         // self.teardown();
     }
