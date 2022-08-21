@@ -49,23 +49,25 @@ impl TestClient for TestHttpClient {
         let addr = self.addr.clone();
         
         tokio::spawn(async move {
-            client.lock().await.connect(addr.clone()).await;
+            let mut client = client.lock().await;
+            client.connect(addr.clone()).await;
 
             let mut total_response_count = 0;
             let mut total_response_time = 0;
             let steps = client_data.lock().await.steps();
+            let mut client_data = client_data.lock().await;
 
-            while client_data.lock().await.rx().is_empty() {
+            while client_data.rx().is_empty() {
                 // TODO Include ramp up
-                if client_data.lock().await.interval() != 0 {
-                    tokio::time::sleep(Duration::from_millis(client_data.lock().await.interval())).await;
+                if client_data.interval() != 0 {
+                    tokio::time::sleep(Duration::from_millis(client_data.interval())).await;
                 }
 
                 for (i, step) in steps.iter().enumerate() {
                     let endpoint = step["step"]["endpoint"].as_str().unwrap();
 
                     let start_time = std::time::Instant::now();
-                    let _resp = client.lock().await
+                    let _resp = client
                         .request(
                             Method::GET,
                             addr.clone(),
@@ -76,14 +78,14 @@ impl TestClient for TestHttpClient {
                         .await
                         .unwrap();
 
-                    client_data.lock().await
+                    client_data
                         .add_response_time(i, start_time.elapsed().as_millis());
-                    client_data.lock().await
+                    client_data
                         .add_response_count(i, 1);
                 }
             }
 
-            client_data.lock().await
+            client_data
                 .response_data()
                 .iter()
                 .for_each(|res_data| {
@@ -95,15 +97,15 @@ impl TestClient for TestHttpClient {
         })
     }
 
-    fn pretest(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
+    fn pretest(&self) -> tokio::task::JoinHandle<()> {
+        let client_data = self.client_data.clone();
         
-        let this = self.clone();
         tokio::spawn(async move {
-            let hej = this;
-            // let pretest = self.clone().client_data.clone().scenario_map().clone().get("pretest");
-            // if pretest.is_none() {
-            //     return ();
-            // }
+            let client_data = client_data.lock().await;
+            let pretest = client_data.scenario_map().get("pretest");
+            if pretest.is_none() {
+                return ();
+            }
 
             println!("Sleeeeep");
             tokio::time::sleep(Duration::from_millis(1000)).await;

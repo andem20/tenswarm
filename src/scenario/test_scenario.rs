@@ -25,9 +25,10 @@ pub struct Scenario {
 impl Scenario {
     pub fn new(scenario_name: &'static str) -> Self {
         let file_path = format!("./scenarios/{scenario_name}.yml");
-
+        
         let scenario_map = utils::file::load_yaml(&file_path).unwrap();
         let scenario = &scenario_map["scenario"];
+        let protocol = scenario["protocol"].as_str().unwrap();
 
         let clients_size = scenario["clients"].as_u64().unwrap() as usize;
         let host = scenario["host"].as_str().unwrap().to_owned();
@@ -40,7 +41,11 @@ impl Scenario {
 
         let (tx, _) = tokio::sync::broadcast::channel(1);
 
-        let clients = create_http_clients(clients_size, &host, port, &scenario_map, &tx);
+        let clients = match protocol {
+            "http" => create_http_clients(clients_size, &host, port, &scenario_map, &tx),
+            "mqtt" => create_mqtt_clients(clients_size, &host, port, &scenario_map, &tx),
+            _ => panic!("No protocol specified")
+        };
 
         Self {
             host,
@@ -55,7 +60,7 @@ impl Scenario {
 
     pub async fn execute(&self) {
         self.pretest().await;
-        self.testloop().await;
+        // self.testloop().await;
         // self.posttest();
         // self.teardown();
     }
@@ -131,26 +136,26 @@ fn create_http_clients(
     clients
 }
 
-// fn create_mqtt_clients(
-//     clients_size: usize,
-//     host: &String,
-//     port: u16,
-//     scenario_map: &Value,
-//     tx: &Sender<bool>,
-// ) -> Vec<Box<dyn TestClient>> {
-//     let mut clients = Vec::with_capacity(clients_size);
+fn create_mqtt_clients(
+    clients_size: usize,
+    host: &String,
+    port: u16,
+    scenario_map: &Value,
+    tx: &Sender<bool>,
+) -> Vec<Arc<dyn TestClient>> {
+    let mut clients = Vec::with_capacity(clients_size);
 
-//     for i in 0..clients_size {
-//         let client: Box<dyn TestClient> = Box::new(TestMqttClient::new(
-//             i,
-//             host,
-//             port,
-//             scenario_map.clone(),
-//             tx.subscribe(),
-//         ));
+    for i in 0..clients_size {
+        let client: Arc<dyn TestClient> = Arc::new(TestMqttClient::new(
+            i,
+            host,
+            port,
+            scenario_map.clone(),
+            tx.subscribe(),
+        ));
 
-//         clients.push(client);
-//     }
+        clients.push(client);
+    }
 
-//     clients
-// }
+    clients
+}

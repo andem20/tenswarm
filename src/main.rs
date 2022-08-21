@@ -10,7 +10,7 @@ use scenario::test_scenario::Scenario;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let scenario = Arc::new(Scenario::new("testcase.http"));
+    let scenario = Arc::new(Scenario::new("testcase.mqtt"));
     scenario.execute().await;
 
     Ok(())

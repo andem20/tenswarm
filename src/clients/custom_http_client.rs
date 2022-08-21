@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
-    net::TcpStream, sync::Mutex,
+    net::TcpStream,
 };
 
 use super::{client_trait::HttpClient, request};

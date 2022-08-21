@@ -104,6 +104,6 @@ pub type TestResult = (u32, u128);
 
 
 pub trait TestClient: Send {
-    fn pretest(self: Arc<Self>) -> tokio::task::JoinHandle<()>;
+    fn pretest(&self) -> tokio::task::JoinHandle<()>;
     fn test_loop(&self) -> tokio::task::JoinHandle<TestResult>;
 }

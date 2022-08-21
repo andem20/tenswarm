@@ -1,17 +1,17 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use rumqttc::{AsyncClient, MqttOptions, EventLoop};
 use serde_yaml::Value;
-use tokio::sync::broadcast::Receiver;
+use tokio::sync::{broadcast::Receiver, Mutex};
 
 use crate::utils;
 
-use super::test_client::{TestClient, TestClientData};
+use super::test_client::{TestClientData, TestClient, TestResult};
 
 pub struct TestMqttClient {
-    client: AsyncClient,
-    eventloop: EventLoop,
-    client_data: TestClientData,
+    client: Arc<Mutex<AsyncClient>>,
+    eventloop: Arc<Mutex<EventLoop>>,
+    client_data: Arc<Mutex<TestClientData>>,
 }
 
 impl TestMqttClient {
@@ -28,12 +28,42 @@ impl TestMqttClient {
 
         let interval = utils::file::get_interval(&scenario_map);
 
-        let client_data = TestClientData::new(scenario_map, steps, rx, interval);
+        let client_data = Arc::new(Mutex::new(TestClientData::new(scenario_map, steps, rx, interval)));
 
         Self {
-            client,
-            eventloop,
+            client: Arc::new(Mutex::new(client)),
+            eventloop: Arc::new(Mutex::new(eventloop)),
             client_data,
         }
+    }
+}
+
+impl TestClient for TestMqttClient {
+    fn pretest(&self) -> tokio::task::JoinHandle<()> {
+        let client_data = self.client_data.clone();
+        let client = self.client.clone();
+        
+        tokio::spawn(async move {
+            let client_data = client_data.lock().await;
+            let client = client.lock().await;
+            
+            let pretest = client_data.scenario_map().get("scenario").unwrap().get("pretest");
+            if pretest.is_none() {
+                return ();
+            }
+
+            let subs = pretest.unwrap().get("subscribe").unwrap().as_sequence().unwrap();
+
+            for sub in subs {
+                let topic = sub.as_str().unwrap();
+                client.subscribe(topic, rumqttc::QoS::AtLeastOnce).await.unwrap();
+            }
+        })
+    }
+
+    fn test_loop(&self) -> tokio::task::JoinHandle<TestResult> {
+        tokio::spawn(async move {
+            (10, 10)
+        })
     }
 }
