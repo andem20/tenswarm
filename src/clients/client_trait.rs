@@ -6,7 +6,7 @@ use super::request::Method;
 
 #[async_trait]
 pub trait HttpClient: Send {
-    async fn connect(self: Box<Self>, addr: Arc<String>) -> Box<dyn HttpClient>;
+    async fn connect(&mut self, addr: Arc<String>);
     async fn request(
         &mut self,
         method: Method,

@@ -1,13 +1,14 @@
 use serde_yaml::Value;
 use std::{
-    sync::Arc,
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant}, sync::Arc,
 };
 use tokio::sync::broadcast::Sender;
 
 use crate::{
-    test_clients::{test_client::TestClient, test_http_client::TestHttpClient},
+    test_clients::{
+        test_client::TestClient, test_http_client::TestHttpClient, test_mqtt_client::TestMqttClient,
+    },
     utils,
 };
 
@@ -16,7 +17,7 @@ pub struct Scenario {
     port: u16,
     ramp_up_millis: u128,
     duration_millis: u128,
-    clients: Vec<Box<dyn TestClient>>,
+    clients: Vec<Arc<dyn TestClient>>,
     scenario_map: Value,
     tx: Sender<bool>,
 }
@@ -39,7 +40,7 @@ impl Scenario {
 
         let (tx, _) = tokio::sync::broadcast::channel(1);
 
-        let clients = create_clients(clients_size, &host, port, &scenario_map, &tx);
+        let clients = create_http_clients(clients_size, &host, port, &scenario_map, &tx);
 
         Self {
             host,
@@ -52,31 +53,40 @@ impl Scenario {
         }
     }
 
-    pub async fn execute(self) {
-        // self.pretest();
+    pub async fn execute(&self) {
+        self.pretest().await;
         self.testloop().await;
         // self.posttest();
         // self.teardown();
     }
 
-    // fn pretest(&self) {}
-
-    async fn testloop(self) {
+    async fn pretest(&self) {
         let mut tasks = Vec::with_capacity(self.clients.len());
 
-        let interval = utils::file::get_interval(self.scenario_map);
+        self.clients.iter().for_each(|client| {
+            let task = client.clone().pretest();
+            tasks.push(task);
+        });
+
+        let result = futures::future::join_all(tasks).await;
+    }
+
+    async fn testloop(&self) {
+        let mut tasks = Vec::with_capacity(self.clients.len());
+
+        let interval = utils::file::get_interval(&self.scenario_map);
         let time_offset = interval / self.clients.len() as u64;
 
         let total_start_time = Instant::now();
 
-        self.clients.into_iter().for_each(|client| {
+        self.clients.iter().for_each(|client| {
             thread::sleep(Duration::from_millis(time_offset));
 
-            let task = client.test_loop();
+            let task = client.clone().test_loop();
             tasks.push(task);
         });
 
-        let timer = utils::time::create_timer(self.duration_millis, self.tx);
+        let timer = utils::time::create_timer(self.duration_millis, self.tx.clone());
 
         let test = futures::future::join_all(tasks).await;
         timer.await.unwrap();
@@ -98,26 +108,49 @@ impl Scenario {
     // fn posttest(&self) {}
 }
 
-fn create_clients(
+fn create_http_clients(
     clients_size: usize,
     host: &String,
     port: u16,
     scenario_map: &Value,
     tx: &Sender<bool>,
-) -> Vec<Box<dyn TestClient>> {
+) -> Vec<Arc<dyn TestClient>> {
     let mut clients = Vec::with_capacity(clients_size);
 
-    let addr = Arc::new(format!("{}:{}", &host, port));
-
     for _ in 0..clients_size {
-        let client: Box<dyn TestClient> = Box::new(TestHttpClient::new(
-            addr.clone(),
+        let client: Arc<dyn TestClient> = Arc::new(TestHttpClient::new(
+            host,
+            port,
             scenario_map.clone(),
             tx.subscribe(),
         ));
-        
+
         clients.push(client);
     }
 
     clients
 }
+
+// fn create_mqtt_clients(
+//     clients_size: usize,
+//     host: &String,
+//     port: u16,
+//     scenario_map: &Value,
+//     tx: &Sender<bool>,
+// ) -> Vec<Box<dyn TestClient>> {
+//     let mut clients = Vec::with_capacity(clients_size);
+
+//     for i in 0..clients_size {
+//         let client: Box<dyn TestClient> = Box::new(TestMqttClient::new(
+//             i,
+//             host,
+//             port,
+//             scenario_map.clone(),
+//             tx.subscribe(),
+//         ));
+
+//         clients.push(client);
+//     }
+
+//     clients
+// }

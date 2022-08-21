@@ -8,12 +8,12 @@ scenario:
 
   protocol: http
 
-  pretest:
-    endpoint: /login
-    method: POST
-    body:
-      username: test@test.com
-      password: password
+  # pretest:
+  #   endpoint: /login
+  #   method: POST
+  #   body:
+  #     username: test@test.com
+  #     password: password
 
   testloop:
     steps:

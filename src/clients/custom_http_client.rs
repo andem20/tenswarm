@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
-    net::TcpStream,
+    net::TcpStream, sync::Mutex,
 };
 
 use super::{client_trait::HttpClient, request};
@@ -26,11 +26,9 @@ impl CustomHttpClient {
 
 #[async_trait]
 impl HttpClient for CustomHttpClient {
-    async fn connect(mut self: Box<Self>, addr: Arc<String>) -> Box<dyn HttpClient> {
+    async fn connect(&mut self, addr: Arc<String>) {
         let connection = BufReader::new(TcpStream::connect(addr.to_string()).await.unwrap());
         self.connections.insert(addr.to_string(), connection);
-
-        self
     }
 
     async fn request(

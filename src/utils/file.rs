@@ -12,7 +12,7 @@ pub fn load_yaml(path: &str) -> Result<Value, Box<dyn Error>> {
     Ok(value)
 }
 
-pub fn get_interval(scenario_map: Value) -> u64 {
+pub fn get_interval(scenario_map: &Value) -> u64 {
     let interval = scenario_map["scenario"]["testloop"]["interval"]
         .as_str()
         .or(Some("0ms")).unwrap();

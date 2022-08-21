@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde_yaml::Value;
 use tokio::sync::broadcast::Receiver;
 
@@ -36,10 +38,11 @@ pub struct TestClientData {
     response_data: Vec<ResponseMetaData>,
     rx: Receiver<bool>,
     interval: u64,
+    scenario_map: Value
 }
 
 impl TestClientData {
-    pub fn new(steps: Vec<Value>, rx: Receiver<bool>, interval: u64) -> Self {
+    pub fn new(scenario_map: Value, steps: Vec<Value>, rx: Receiver<bool>, interval: u64) -> Self {
         let mut response_data = Vec::with_capacity(steps.len());
 
         steps.iter().for_each(|_| {
@@ -52,6 +55,7 @@ impl TestClientData {
             response_data,
             rx,
             interval,
+            scenario_map
         }
     }
 
@@ -85,11 +89,21 @@ impl TestClientData {
         &self.rx
     }
 
+
+    pub fn scenario_map(&self) -> &Value {
+        &self.scenario_map
+    }
+
+    pub fn as_mut(&mut self) -> &mut Self {
+        self
+    }
 }
 
 // TODO temporary type for test result
 pub type TestResult = (u32, u128);
 
-pub trait TestClient {
-    fn test_loop(self: Box<Self>) -> tokio::task::JoinHandle<TestResult>;
+
+pub trait TestClient: Send {
+    fn pretest(self: Arc<Self>) -> tokio::task::JoinHandle<()>;
+    fn test_loop(&self) -> tokio::task::JoinHandle<TestResult>;
 }
