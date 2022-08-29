@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+#[allow(dead_code)]
 pub struct Request {
     method: Method,
     addr: Arc<String>,
@@ -8,6 +9,7 @@ pub struct Request {
     body: Option<Arc<String>>,
 }
 
+#[allow(dead_code)]
 impl Request {
     pub fn new(
         method: Method,
@@ -26,6 +28,7 @@ impl Request {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum Method {
     GET,

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use serde_yaml::Value;
 use tokio::sync::broadcast::Receiver;
 
@@ -32,17 +30,46 @@ impl ResponseMetaData {
         self.response_time += time;
     }
 }
+#[derive(Debug, Clone)]
+pub struct Step {
+    step: Value,
+    time: u128,
+    count: usize,
+}
+
+impl Step {
+    pub fn new(step: Value) -> Self {
+        Self {
+            step,
+            time: 0,
+            count: 0
+        }
+    }
+
+    pub fn step(&self) -> &Value {
+        &self.step
+    }
+
+    pub fn add_time(&mut self, time: u128) {
+        self.time += time;
+    }
+
+    pub fn add_count(&mut self) {
+        self.count += 1;
+    }
+}
 
 pub struct TestClientData {
-    steps: Vec<Value>,
+    steps: Vec<Step>,
     response_data: Vec<ResponseMetaData>,
     rx: Receiver<bool>,
     interval: u64,
-    scenario_map: Value
+    scenario_map: Value,
+    id: usize
 }
 
 impl TestClientData {
-    pub fn new(scenario_map: Value, steps: Vec<Value>, rx: Receiver<bool>, interval: u64) -> Self {
+    pub fn new(scenario_map: Value, steps: Vec<Step>, rx: Receiver<bool>, interval: u64, id: usize) -> Self {
         let mut response_data = Vec::with_capacity(steps.len());
 
         steps.iter().for_each(|_| {
@@ -55,7 +82,8 @@ impl TestClientData {
             response_data,
             rx,
             interval,
-            scenario_map
+            scenario_map,
+            id
         }
     }
 
@@ -63,7 +91,7 @@ impl TestClientData {
         self.interval
     }
 
-    pub fn steps(&self) -> Vec<Value> {
+    pub fn steps(&self) -> Vec<Step> {
         self.steps.clone()
     }
 
@@ -92,10 +120,6 @@ impl TestClientData {
 
     pub fn scenario_map(&self) -> &Value {
         &self.scenario_map
-    }
-
-    pub fn as_mut(&mut self) -> &mut Self {
-        self
     }
 }
 

@@ -13,8 +13,6 @@ use crate::{
 };
 
 pub struct Scenario {
-    host: String,
-    port: u16,
     ramp_up_millis: u128,
     duration_millis: u128,
     clients: Vec<Arc<dyn TestClient>>,
@@ -48,8 +46,6 @@ impl Scenario {
         };
 
         Self {
-            host,
-            port,
             ramp_up_millis,
             duration_millis,
             clients,
@@ -73,7 +69,7 @@ impl Scenario {
             tasks.push(task);
         });
 
-        let result = futures::future::join_all(tasks).await;
+        let _result = futures::future::join_all(tasks).await;
     }
 
     async fn testloop(&self) {
@@ -122,8 +118,9 @@ fn create_http_clients(
 ) -> Vec<Arc<dyn TestClient>> {
     let mut clients = Vec::with_capacity(clients_size);
 
-    for _ in 0..clients_size {
+    for i in 0..clients_size {
         let client: Arc<dyn TestClient> = Arc::new(TestHttpClient::new(
+            i,
             host,
             port,
             scenario_map.clone(),

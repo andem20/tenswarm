@@ -1,5 +1,5 @@
 scenario:
-  clients: 200
+  clients: 1
   ramp-up: 2s
   duration: 5s
 
@@ -19,4 +19,7 @@ scenario:
     steps:
       - step:
           endpoint: /
+          method: GET
+      - step:
+          endpoint: /?test=test
           method: GET

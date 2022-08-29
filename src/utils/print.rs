@@ -1,4 +1,4 @@
-use std::{collections::HashSet, time::{Duration, Instant}};
+use std::{collections::HashSet, time::Instant};
 
 const PROGRESS_BAR_SIZE: usize = 40;
 

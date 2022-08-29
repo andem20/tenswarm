@@ -8,7 +8,7 @@ use crate::{
     utils,
 };
 
-use super::test_client::{TestClient, TestClientData, TestResult};
+use super::test_client::{TestClient, TestClientData, TestResult, Step};
 
 type Client = Arc<Mutex<dyn HttpClient + Send + Sync>>;
 
@@ -19,7 +19,7 @@ pub struct TestHttpClient {
 }
 
 impl TestHttpClient {
-    pub fn new(host: &str, port: u16, scenario_map: Value, rx: Receiver<bool>) -> Self {
+    pub fn new(id: usize, host: &str, port: u16, scenario_map: Value, rx: Receiver<bool>) -> Self {
         let client: Client = Arc::new(Mutex::new(CustomHttpClient::new()));
 
         let addr = Arc::new(format!("{}:{}", &host, port));
@@ -29,9 +29,16 @@ impl TestHttpClient {
             .unwrap()
             .clone();
 
+        let mut steps_vec = Vec::with_capacity(steps.len());
+
+        for step in steps {
+            let step = Step::new(step.get("step").unwrap().to_owned());
+            steps_vec.push(step);
+        }
+
         let interval = utils::file::get_interval(&scenario_map);
 
-        let client_data = Arc::new(Mutex::new(TestClientData::new(scenario_map, steps, rx, interval)));
+        let client_data = Arc::new(Mutex::new(TestClientData::new(scenario_map, steps_vec, rx, interval, id)));
 
         TestHttpClient {
             client,
@@ -42,7 +49,7 @@ impl TestHttpClient {
 }
 
 impl TestClient for TestHttpClient {
-    fn test_loop(&self) -> tokio::task::JoinHandle<(TestResult)> {
+    fn test_loop(&self) -> tokio::task::JoinHandle<TestResult> {
         let headers = Arc::new("Host: localhost".to_owned());
         let client_data = self.client_data.clone();
         let client = self.client.clone();
@@ -54,7 +61,7 @@ impl TestClient for TestHttpClient {
 
             let mut total_response_count = 0;
             let mut total_response_time = 0;
-            let steps = client_data.lock().await.steps();
+            let mut steps = client_data.lock().await.steps();
             let mut client_data = client_data.lock().await;
 
             while client_data.rx().is_empty() {
@@ -63,8 +70,8 @@ impl TestClient for TestHttpClient {
                     tokio::time::sleep(Duration::from_millis(client_data.interval())).await;
                 }
 
-                for (i, step) in steps.iter().enumerate() {
-                    let endpoint = step["step"]["endpoint"].as_str().unwrap();
+                for (i, step) in steps.iter_mut().enumerate() {
+                    let endpoint = step.step()["endpoint"].as_str().unwrap();
 
                     let start_time = std::time::Instant::now();
                     let _resp = client
@@ -77,9 +84,14 @@ impl TestClient for TestHttpClient {
                         )
                         .await
                         .unwrap();
+                    
+                    let time = start_time.elapsed().as_millis();
+                    
+                    step.add_time(time);
+                    step.add_count();
 
                     client_data
-                        .add_response_time(i, start_time.elapsed().as_millis());
+                        .add_response_time(i, time);
                     client_data
                         .add_response_count(i, 1);
                 }

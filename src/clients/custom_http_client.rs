@@ -43,6 +43,10 @@ impl HttpClient for CustomHttpClient {
         all_header.push_str(&headers);
         all_header.push_str("\r\n\r\n");
 
+        if let Some(_body) = body {
+            todo!("Missing body");
+        }
+
         let stream = self.connections.get_mut(&addr.to_string()).unwrap();
 
         stream.write_all(all_header.as_bytes()).await?;
