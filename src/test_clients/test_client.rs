@@ -1,35 +1,8 @@
+use std::sync::Arc;
+
 use serde_yaml::Value;
-use tokio::sync::broadcast::Receiver;
+use tokio::sync::{broadcast::Receiver, Mutex};
 
-pub struct ResponseMetaData {
-    response_count: u32,
-    response_time: u128,
-}
-
-impl ResponseMetaData {
-    fn new() -> Self {
-        Self {
-            response_count: 0,
-            response_time: 0,
-        }
-    }
-
-    pub fn response_count(&self) -> u32 {
-        self.response_count
-    }
-
-    pub fn add_response_count(&mut self, count: u32) {
-        self.response_count += count;
-    }
-
-    pub fn response_time(&self) -> u128 {
-        self.response_time
-    }
-
-    pub fn add_response_time(&mut self, time: u128) {
-        self.response_time += time;
-    }
-}
 #[derive(Debug, Clone)]
 pub struct Step {
     step: Value,
@@ -57,11 +30,18 @@ impl Step {
     pub fn add_count(&mut self) {
         self.count += 1;
     }
+
+    pub fn time(&self) -> u128 {
+        self.time
+    }
+
+    pub fn count(&self) -> usize {
+        self.count
+    }
 }
 
 pub struct TestClientData {
-    steps: Vec<Step>,
-    response_data: Vec<ResponseMetaData>,
+    pub steps: Vec<Step>,
     rx: Receiver<bool>,
     interval: u64,
     scenario_map: Value,
@@ -70,16 +50,8 @@ pub struct TestClientData {
 
 impl TestClientData {
     pub fn new(scenario_map: Value, steps: Vec<Step>, rx: Receiver<bool>, interval: u64, id: usize) -> Self {
-        let mut response_data = Vec::with_capacity(steps.len());
-
-        steps.iter().for_each(|_| {
-            let meta_data = ResponseMetaData::new();
-            response_data.push(meta_data);
-        });
-
         Self {
             steps,
-            response_data,
             rx,
             interval,
             scenario_map,
@@ -91,26 +63,8 @@ impl TestClientData {
         self.interval
     }
 
-    pub fn steps(&self) -> Vec<Step> {
-        self.steps.clone()
-    }
-
-    pub fn add_response_count(&mut self, index: usize, count: u32) {
-        self.response_data
-            .get_mut(index)
-            .unwrap()
-            .add_response_count(count);
-    }
-
-    pub fn add_response_time(&mut self, index: usize, time: u128) {
-        self.response_data
-            .get_mut(index)
-            .unwrap()
-            .add_response_time(time);
-    }
-
-    pub fn response_data(&self) -> &[ResponseMetaData] {
-        self.response_data.as_ref()
+    pub fn steps(&self) -> &Vec<Step> {
+        &self.steps
     }
 
     pub fn rx(&self) -> &Receiver<bool> {
@@ -129,5 +83,6 @@ pub type TestResult = (u32, u128);
 
 pub trait TestClient: Send {
     fn pretest(&self) -> tokio::task::JoinHandle<()>;
-    fn test_loop(&self) -> tokio::task::JoinHandle<TestResult>;
+    fn test_loop(&self) -> tokio::task::JoinHandle<()>;
+    fn client_data(&self) -> Arc<Mutex<TestClientData>>;
 }

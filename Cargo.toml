@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1.57"
 futures = "0.3.21"
+hyper = { version = "0.14.20", features = ["client", "full"] }
 rumqttc = "0.14.0"
 serde_yaml = "0.8.26"
 tokio = { version = "1.20", features = ["full"] }

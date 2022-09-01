@@ -1,7 +1,8 @@
 use serde_yaml::Value;
 use std::{
+    sync::Arc,
     thread,
-    time::{Duration, Instant}, sync::Arc,
+    time::{Duration, Instant}, collections::HashMap,
 };
 use tokio::sync::broadcast::Sender;
 
@@ -9,7 +10,7 @@ use crate::{
     test_clients::{
         test_client::TestClient, test_http_client::TestHttpClient, test_mqtt_client::TestMqttClient,
     },
-    utils,
+    utils::{self, print},
 };
 
 pub struct Scenario {
@@ -23,7 +24,7 @@ pub struct Scenario {
 impl Scenario {
     pub fn new(scenario_name: &'static str) -> Self {
         let file_path = format!("./scenarios/{scenario_name}.yml");
-        
+
         let scenario_map = utils::file::load_yaml(&file_path).unwrap();
         let scenario = &scenario_map["scenario"];
         let protocol = scenario["protocol"].as_str().unwrap();
@@ -42,7 +43,7 @@ impl Scenario {
         let clients = match protocol {
             "http" => create_http_clients(clients_size, &host, port, &scenario_map, &tx),
             "mqtt" => create_mqtt_clients(clients_size, &host, port, &scenario_map, &tx),
-            _ => panic!("No protocol specified")
+            _ => panic!("No protocol specified"),
         };
 
         Self {
@@ -89,19 +90,28 @@ impl Scenario {
 
         let timer = utils::time::create_timer(self.duration_millis, self.tx.clone());
 
-        let test = futures::future::join_all(tasks).await;
+        futures::future::join_all(tasks).await;
         timer.await.unwrap();
 
-        let mut total_response_count = 0;
-        let mut total_response_time = 0;
+        let mut steps_vec: Vec<(u128, usize)> = Vec::new(); // (time, count)
 
-        test.into_iter().for_each(|result| {
-            let (response_count, response_time) = result.unwrap();
-            total_response_count += response_count;
-            total_response_time += response_time;
-        });
+        for client in self.clients.iter() {
+            let client_data = client.client_data();
+            for (i, step) in client_data.lock().await.steps().iter().enumerate() {
+                if let Some(step_values) = steps_vec.get_mut(i) {
+                    step_values.0 += step.time();
+                    step_values.1 += step.count();
+                } else {
+                    steps_vec.insert(i, (0, 0));
+                }
+            }
+        }
 
-        utils::print::print_conclusion(total_start_time, total_response_count, total_response_time);
+        for (i, step) in steps_vec.iter().enumerate() {
+            println!("Step #{}: {:.2} ms", i, step.0 as f64 / step.1 as f64);
+        }
+
+        // utils::print::print_conclusion(total_start_time, total_response_count, total_response_time);
     }
 
     // fn teardown(&self) {}
@@ -109,6 +119,7 @@ impl Scenario {
     // fn posttest(&self) {}
 }
 
+// TODO fix recurrent code
 fn create_http_clients(
     clients_size: usize,
     host: &String,

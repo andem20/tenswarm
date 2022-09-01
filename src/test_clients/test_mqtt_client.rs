@@ -73,7 +73,7 @@ impl TestClient for TestMqttClient {
         })
     }
 
-    fn test_loop(&self) -> tokio::task::JoinHandle<TestResult> {
+    fn test_loop(&self) -> tokio::task::JoinHandle<()> {
 
         let client = self.client.clone();
         let client_data = self.client_data.clone();
@@ -82,9 +82,9 @@ impl TestClient for TestMqttClient {
 
         tokio::spawn(async move {
             let publish = Value::String("publish".to_owned());
-            let steps = client_data.lock().await.steps();
-            while client_data.lock().await.rx().is_empty() {
-                for step in steps.iter() {
+            let client_data = client_data.lock().await;
+            while client_data.rx().is_empty() {
+                for step in client_data.steps() {
                     let step = step.step().as_mapping().unwrap();
                     if step.contains_key(&publish) {
                         let client = client.lock().await;
@@ -112,8 +112,10 @@ impl TestClient for TestMqttClient {
                 }
 
             }
-            
-            (response_count, 10)
         })
+    }
+
+    fn client_data(&self) -> Arc<Mutex<TestClientData>> {
+        todo!()
     }
 }
