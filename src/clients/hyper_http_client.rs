@@ -31,7 +31,7 @@ impl HttpClient for HyperHttpClient {
         headers: Arc<String>,
         body: Option<Arc<String>>,
     ) -> Result<Vec<u8>, Box<dyn Error>> {
-        let addr = format!("http://{}", &addr.to_string());
+        let addr = format!("http://{}{}", &addr.to_string(), &endpoint);
         let uri = Uri::from_str(&addr)?;
         let response = self.client.get(uri).await?;
 

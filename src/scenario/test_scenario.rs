@@ -108,7 +108,9 @@ impl Scenario {
         }
 
         for (i, step) in steps_vec.iter().enumerate() {
-            println!("Step #{}: {:.2} ms", i, step.0 as f64 / step.1 as f64);
+            let avg_response_time = step.0 as f64 / step.1 as f64;
+            let requests_per_second = (step.1 as f64 / total_start_time.elapsed().as_secs_f64()) as u32;
+            println!("Step #{}: {:.2} ms, {} req/sec", i, avg_response_time, requests_per_second);
         }
 
         // utils::print::print_conclusion(total_start_time, total_response_count, total_response_time);

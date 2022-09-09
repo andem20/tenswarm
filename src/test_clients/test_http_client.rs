@@ -4,7 +4,7 @@ use serde_yaml::Value;
 use tokio::sync::{broadcast::Receiver, Mutex};
 
 use crate::{
-    clients::{client_trait::HttpClient, custom_http_client::CustomHttpClient, request::Method},
+    clients::{client_trait::HttpClient, custom_http_client::CustomHttpClient, request::Method, hyper_http_client::HyperHttpClient},
     utils,
 };
 
