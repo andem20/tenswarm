@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc, borrow::Borrow};
+use std::sync::Arc;
 
 use rumqttc::{AsyncClient, EventLoop, MqttOptions};
 use serde_yaml::Value;
@@ -6,7 +6,7 @@ use tokio::sync::{broadcast::Receiver, Mutex};
 
 use crate::utils;
 
-use super::test_client::{Step, TestClient, TestClientData, TestResult};
+use super::test_client::{Step, TestClient, TestClientData};
 
 pub struct TestMqttClient {
     client: Arc<Mutex<AsyncClient>>,

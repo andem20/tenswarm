@@ -34,7 +34,7 @@ pub fn create_timer(duration_millis: u128, tx: tokio::sync::broadcast::Sender<bo
 
             let progress =
                 instant.duration_since(start_time).as_millis() as f32 / duration_millis as f32;
-            // print_progress(progress);
+            print_progress(progress);
 
             if instant.duration_since(start_time).as_millis() >= duration_millis {
                 tx.send(true).unwrap();

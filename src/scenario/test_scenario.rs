@@ -2,7 +2,7 @@ use serde_yaml::Value;
 use std::{
     sync::Arc,
     thread,
-    time::{Duration, Instant}, collections::HashMap,
+    time::{Duration, Instant},
 };
 use tokio::sync::broadcast::Sender;
 
@@ -10,7 +10,7 @@ use crate::{
     test_clients::{
         test_client::TestClient, test_http_client::TestHttpClient, test_mqtt_client::TestMqttClient,
     },
-    utils::{self, print},
+    utils,
 };
 
 pub struct Scenario {

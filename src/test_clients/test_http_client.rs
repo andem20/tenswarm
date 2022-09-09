@@ -1,14 +1,14 @@
-use std::{sync::Arc, time::Duration, borrow::Borrow};
+use std::{sync::Arc, time::Duration};
 
 use serde_yaml::Value;
 use tokio::sync::{broadcast::Receiver, Mutex};
 
 use crate::{
-    clients::{client_trait::HttpClient, custom_http_client::CustomHttpClient, request::Method, hyper_http_client::HyperHttpClient},
+    clients::{client_trait::HttpClient, custom_http_client::CustomHttpClient, request::Method},
     utils,
 };
 
-use super::test_client::{TestClient, TestClientData, TestResult};
+use super::test_client::{TestClient, TestClientData};
 
 type Client = Arc<Mutex<dyn HttpClient + Send + Sync>>;
 
